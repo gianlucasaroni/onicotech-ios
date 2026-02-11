@@ -28,6 +28,8 @@ struct ClientDetailView: View {
     @State private var errorMessage: String?
     @State private var selectedFilter: AppointmentFilter = .upcoming
     @State private var showingEditSheet = false
+    @State private var photos: [Photo] = []
+    @State private var selectedPhoto: Photo?
     @State private var showingAddAppointmentSheet = false
     @State private var selectedAppointment: Appointment?
     @State private var appointmentViewModel = AppointmentViewModel()
@@ -87,6 +89,12 @@ struct ClientDetailView: View {
                 Text("Informazioni")
             }
             
+            Section("Galleria") {
+                PhotoHorizontalList(photos: photos, onPhotoSelected: { photo in
+                    selectedPhoto = photo
+                })
+            }
+            
             // Filter picker + appointments
             Section {
                 Picker("Filtro", selection: $selectedFilter) {
@@ -143,7 +151,12 @@ struct ClientDetailView: View {
             }
         }
         .sheet(isPresented: $showingEditSheet) {
-            ClientFormView(viewModel: clientViewModel, client: client)
+            NavigationStack {
+                ClientFormView(viewModel: clientViewModel, client: client)
+            }
+        }
+        .fullScreenCover(item: $selectedPhoto) { photo in
+            PhotoGalleryViewer(photos: photos, initialPhoto: photo)
         }
         .sheet(isPresented: $showingAddAppointmentSheet) {
             Task { await loadAppointments() }
@@ -158,6 +171,7 @@ struct ClientDetailView: View {
         }
         .task {
             await loadAppointments()
+            await loadPhotos()
         }
     }
     
@@ -186,6 +200,15 @@ struct ClientDetailView: View {
             errorMessage = error.localizedDescription
         }
         isLoading = false
+    }
+    
+    private func loadPhotos() async {
+        do {
+            guard let clientId = client.id else { return }
+            photos = try await APIClient.shared.getClientPhotos(clientId: clientId)
+        } catch {
+            print("Error loading client photos: \(error)")
+        }
     }
     
     private func currentDateString() -> String {
@@ -228,14 +251,13 @@ struct AppointmentRowCompact: View {
                         .font(.subheadline)
                         .fontWeight(.medium)
                         .monospacedDigit()
-                    
                     if let status = appointment.status {
                         Image(systemName: status.iconName)
                             .font(.caption)
                             .foregroundStyle(statusColor)
                     }
+                    
                 }
-                
                 if let services = appointment.services, !services.isEmpty {
                     Text(services.map(\.name).joined(separator: ", "))
                         .font(.caption)

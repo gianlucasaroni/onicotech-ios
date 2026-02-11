@@ -27,7 +27,8 @@ actor APIClient {
     static let shared = APIClient()
     
     // MARK: - Change this to your backend URL
-    private let baseURL = "http://onicotech.pve.local:8282/api/v1"
+    //private let baseURL = "http://onicotech.pve.local:8282/api/v1"
+    private let baseURL = "http://172.20.10.2:8282/api/v1"
     
     private let decoder: JSONDecoder = {
         let decoder = JSONDecoder()
@@ -244,5 +245,68 @@ actor APIClient {
     
     func invalidateCache() async throws {
         try await requestNoContent(path: "/cache/invalidate", method: "POST")
+    }
+    
+    // MARK: - Photos
+    
+    func uploadPhoto(appointmentId: UUID, image: Data, type: String) async throws -> Photo {
+        let url = URL(string: "\(baseURL)/appointments/\(appointmentId)/photos")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        
+        let boundary = "Boundary-\(UUID().uuidString)"
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        
+        var body = Data()
+        
+        // appointmentId field
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"appointmentId\"\r\n\r\n".data(using: .utf8)!)
+        body.append("\(appointmentId.uuidString)\r\n".data(using: .utf8)!)
+        
+        // type field
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"type\"\r\n\r\n".data(using: .utf8)!)
+        body.append("\(type)\r\n".data(using: .utf8)!)
+        
+        // image file
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"image\"; filename=\"photo.jpg\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
+        body.append(image)
+        body.append("\r\n".data(using: .utf8)!)
+        
+        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+        
+        request.httpBody = body
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
+            if let errorResponse = try? decoder.decode(APIResponse<String>.self, from: data) {
+                throw APIError.serverError(errorResponse.message ?? "Errore sconosciuto")
+            }
+            throw APIError.serverError("Upload fallito")
+        }
+        
+        let apiResponse = try decoder.decode(APIResponse<Photo>.self, from: data)
+        guard let photo = apiResponse.data else { throw APIError.invalidResponse }
+        return photo
+    }
+    
+    func deletePhoto(id: UUID) async throws {
+        try await requestNoContent(path: "/photos/\(id)", method: "DELETE")
+    }
+    
+    func getAppointmentPhotos(appointmentId: UUID) async throws -> [Photo] {
+        let endpoint = "appointments/\(appointmentId.uuidString)/photos"
+        let response: APIResponse<[Photo]> = try await request(path: "/\(endpoint)") // Assuming 'request' is the general method and 'path' expects a leading slash
+        return response.data ?? []
+    }
+    
+    func getClientPhotos(clientId: UUID) async throws -> [Photo] {
+        let endpoint = "clients/\(clientId.uuidString)/photos"
+        let response: APIResponse<[Photo]> = try await request(path: "/\(endpoint)") // Assuming 'request' is the general method and 'path' expects a leading slash
+        return response.data ?? []
     }
 }

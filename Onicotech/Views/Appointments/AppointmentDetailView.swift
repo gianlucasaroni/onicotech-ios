@@ -90,7 +90,6 @@ struct AppointmentDetailView: View {
                             .buttonStyle(.plain)
                         }
                         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                        .listRowBackground(Color.clear)
                     }
                 }
             }
@@ -123,6 +122,68 @@ struct AppointmentDetailView: View {
                 }
             }
             
+            // Photos
+            Section("Galleria") {
+                if photos.isEmpty {
+                    Text("Nessuna foto caricata")
+                        .foregroundStyle(.secondary)
+                        .italic()
+                } else {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            if isUploading {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(Color.gray.opacity(0.1))
+                                        .frame(width: 100, height: 100)
+                                    ProgressView()
+                                }
+                            }
+                            
+                            ForEach(photos) { photo in
+                                // List uses Thumbnail (fallback to original if missing)
+                                AsyncImage(url: URL(string: photo.thumbnailUrl ?? photo.url)) { phase in
+                                    switch phase {
+                                    case .empty:
+                                        ProgressView()
+                                            .frame(width: 100, height: 100)
+                                    case .success(let image):
+                                        image
+                                            .resizable()
+                                            .scaledToFill()
+                                            .frame(width: 100, height: 100)
+                                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                                            .onTapGesture {
+                                                selectedPhoto = photo
+                                            }
+                                            .contextMenu {
+                                                Button(role: .destructive) {
+                                                    deletePhoto(photo)
+                                                } label: {
+                                                    Label("Elimina", systemImage: "trash")
+                                                }
+                                            }
+                                    case .failure:
+                                        Image(systemName: "photo")
+                                            .frame(width: 100, height: 100)
+                                            .background(Color.gray.opacity(0.1))
+                                    @unknown default:
+                                        EmptyView()
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.vertical, 8)
+                    }
+                }
+                
+                Button {
+                    showImagePicker = true
+                } label: {
+                    Label("Aggiungi Foto", systemImage: "camera")
+                }
+            }
+            
             // Notes
             if let notes = appointment.notes, !notes.isEmpty {
                 Section("Note") {
@@ -139,6 +200,72 @@ struct AppointmentDetailView: View {
         }
         .sheet(isPresented: $showEditSheet) {
             AppointmentFormView(viewModel: viewModel, appointment: appointment)
+        }
+        .sheet(isPresented: $showImagePicker) {
+            ImagePicker(image: $inputImage)
+        }
+        .fullScreenCover(item: $selectedPhoto) { photo in
+            PhotoGalleryViewer(photos: photos, initialPhoto: photo)
+        }
+        .onChange(of: inputImage) { _ in
+            uploadSelectedImage()
+        }
+        .task {
+            await loadPhotos()
+        }
+    }
+    
+    @State private var photos: [Photo] = []
+    @State private var selectedPhoto: Photo?
+    @State private var showImagePicker = false
+    @State private var inputImage: UIImage?
+    @State private var isUploading = false
+    
+    private func loadPhotos() async {
+        do {
+            photos = try await APIClient.shared.getAppointmentPhotos(appointmentId: appointmentId)
+        } catch {
+            print("Error loading photos: \(error)")
+        }
+    }
+    
+    private func uploadSelectedImage() {
+        guard let inputImage = inputImage else { return }
+        guard let imageData = inputImage.jpegData(compressionQuality: 0.8) else { return }
+        
+        isUploading = true
+        Task {
+            do {
+                // Determine type based on date? Or prompt user? For now default to "result" (after)
+                // Or "other".
+                // Simple implementation: just upload.
+                let newPhoto = try await APIClient.shared.uploadPhoto(appointmentId: appointmentId, image: imageData, type: "after")
+                
+                // Add to list immediately
+                await MainActor.run {
+                    photos.insert(newPhoto, at: 0)
+                    self.inputImage = nil
+                    isUploading = false
+                }
+            } catch {
+                print("Upload failed: \(error)")
+                isUploading = false
+            }
+        }
+    }
+    
+    private func deletePhoto(_ photo: Photo) {
+        Task {
+            do {
+                try await APIClient.shared.deletePhoto(id: photo.id)
+                await MainActor.run {
+                    if let index = photos.firstIndex(of: photo) {
+                        photos.remove(at: index)
+                    }
+                }
+            } catch {
+                print("Delete failed: \(error)")
+            }
         }
     }
     
@@ -175,5 +302,97 @@ struct AppointmentDetailView: View {
         
         let encoded = msg.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
         return URL(string: "https://wa.me/\(finalPhone)?text=\(encoded)") ?? URL(string: "https://wa.me/\(finalPhone)")!
+    }
+}
+
+struct PhotoGalleryViewer: View {
+    let photos: [Photo]
+    @State private var selection: Photo
+    @Environment(\.dismiss) private var dismiss
+    
+    init(photos: [Photo], initialPhoto: Photo) {
+        self.photos = photos
+        self._selection = State(initialValue: initialPhoto)
+    }
+    
+    var body: some View {
+        NavigationStack {
+            TabView(selection: $selection) {
+                ForEach(photos) { photo in
+                    ZoomableImageView(url: URL(string: photo.url))
+                        .tag(photo)
+                }
+            }
+            .tabViewStyle(.page(indexDisplayMode: .always))
+            .background(Color.black)
+            .navigationTitle("Galleria")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Chiudi") { dismiss() }
+                }
+            }
+            .preferredColorScheme(.dark)
+        }
+    }
+}
+
+struct ZoomableImageView: UIViewRepresentable {
+    let url: URL?
+    
+    func makeUIView(context: Context) -> UIScrollView {
+        let scrollView = UIScrollView()
+        scrollView.delegate = context.coordinator
+        scrollView.maximumZoomScale = 5.0
+        scrollView.minimumZoomScale = 1.0
+        scrollView.showsVerticalScrollIndicator = false
+        scrollView.showsHorizontalScrollIndicator = false
+        scrollView.backgroundColor = .black
+        
+        let imageView = UIImageView()
+        imageView.contentMode = .scaleAspectFit
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.addSubview(imageView)
+        
+        NSLayoutConstraint.activate([
+            imageView.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
+            imageView.heightAnchor.constraint(equalTo: scrollView.heightAnchor),
+            imageView.centerXAnchor.constraint(equalTo: scrollView.centerXAnchor),
+            imageView.centerYAnchor.constraint(equalTo: scrollView.centerYAnchor)
+        ])
+        
+        context.coordinator.imageView = imageView
+        
+        // Load Image
+        if let url {
+            Task {
+                do {
+                    let (data, _) = try await URLSession.shared.data(from: url)
+                    if let image = UIImage(data: data) {
+                        await MainActor.run {
+                            imageView.image = image
+                        }
+                    }
+                } catch {
+                    print("Failed to load image for zoom: \(error)")
+                }
+            }
+        }
+        
+        return scrollView
+    }
+    
+    func updateUIView(_ uiView: UIScrollView, context: Context) {}
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+    
+    class Coordinator: NSObject, UIScrollViewDelegate {
+        var imageView: UIImageView?
+        
+        func viewForZooming(in scrollView: UIScrollView) -> UIView? {
+            return imageView
+        }
     }
 }
