@@ -1,0 +1,248 @@
+import Foundation
+
+enum APIError: LocalizedError {
+    case invalidURL
+    case invalidResponse
+    case serverError(String)
+    case decodingError(Error)
+    case networkError(Error)
+    
+    var errorDescription: String? {
+        switch self {
+        case .invalidURL:
+            return "URL non valido"
+        case .invalidResponse:
+            return "Risposta del server non valida"
+        case .serverError(let message):
+            return message
+        case .decodingError:
+            return "Errore nella lettura dei dati"
+        case .networkError(let error):
+            return "Errore di rete: \(error.localizedDescription)"
+        }
+    }
+}
+
+actor APIClient {
+    static let shared = APIClient()
+    
+    // MARK: - Change this to your backend URL
+    private let baseURL = "http://onicotech.pve.local:8282/api/v1"
+    
+    private let decoder: JSONDecoder = {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return decoder
+    }()
+    
+    private let encoder: JSONEncoder = {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        return encoder
+    }()
+    
+    // MARK: - Generic Request
+    
+    private func request<T: Codable>(
+        path: String,
+        method: String = "GET",
+        body: (any Encodable)? = nil,
+        queryItems: [URLQueryItem]? = nil
+    ) async throws -> T {
+        guard var urlComponents = URLComponents(string: "\(baseURL)\(path)") else {
+            throw APIError.invalidURL
+        }
+        
+        if let queryItems {
+            urlComponents.queryItems = queryItems
+        }
+        
+        guard let url = urlComponents.url else {
+            throw APIError.invalidURL
+        }
+        
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = method
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        if let body {
+            urlRequest.httpBody = try encoder.encode(body)
+        }
+        
+        let (data, response): (Data, URLResponse)
+        do {
+            (data, response) = try await URLSession.shared.data(for: urlRequest)
+        } catch {
+            throw APIError.networkError(error)
+        }
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+        
+        if httpResponse.statusCode == 204 {
+            // No Content — return a placeholder for Void-like responses
+            if let empty = Optional<T>.none as? T {
+                return empty
+            }
+            // Try to decode empty response
+            let emptyJSON = "{}".data(using: .utf8)!
+            return try decoder.decode(T.self, from: emptyJSON)
+        }
+        
+        guard (200...299).contains(httpResponse.statusCode) else {
+            if let errorResponse = try? decoder.decode(APIResponse<String>.self, from: data) {
+                throw APIError.serverError(errorResponse.message ?? "Errore sconosciuto")
+            }
+            throw APIError.serverError("Errore del server (codice \(httpResponse.statusCode))")
+        }
+        
+        do {
+            return try decoder.decode(T.self, from: data)
+        } catch {
+            throw APIError.decodingError(error)
+        }
+    }
+    
+    // MARK: - No-response request (for DELETE)
+    
+    private func requestNoContent(
+        path: String,
+        method: String
+    ) async throws {
+        guard let url = URL(string: "\(baseURL)\(path)") else {
+            throw APIError.invalidURL
+        }
+        
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = method
+        
+        let (data, response): (Data, URLResponse)
+        do {
+            (data, response) = try await URLSession.shared.data(for: urlRequest)
+        } catch {
+            throw APIError.networkError(error)
+        }
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+        
+        guard (200...299).contains(httpResponse.statusCode) else {
+            if let errorResponse = try? decoder.decode(APIResponse<String>.self, from: data) {
+                throw APIError.serverError(errorResponse.message ?? "Errore sconosciuto")
+            }
+            throw APIError.serverError("Errore del server (codice \(httpResponse.statusCode))")
+        }
+    }
+    
+    // MARK: - Clients
+    
+    func getClients() async throws -> [Client] {
+        let response: APIResponse<[Client]> = try await request(path: "/clients")
+        return response.data ?? []
+    }
+    
+    func getClient(id: UUID) async throws -> Client {
+        let response: APIResponse<Client> = try await request(path: "/clients/\(id)")
+        guard let client = response.data else { throw APIError.invalidResponse }
+        return client
+    }
+    
+    func createClient(_ client: Client) async throws -> Client {
+        let response: APIResponse<Client> = try await request(path: "/clients", method: "POST", body: client)
+        guard let created = response.data else { throw APIError.invalidResponse }
+        return created
+    }
+    
+    func updateClient(id: UUID, _ client: Client) async throws -> Client {
+        let response: APIResponse<Client> = try await request(path: "/clients/\(id)", method: "PUT", body: client)
+        guard let updated = response.data else { throw APIError.invalidResponse }
+        return updated
+    }
+    
+    func deleteClient(id: UUID) async throws {
+        try await requestNoContent(path: "/clients/\(id)", method: "DELETE")
+    }
+    
+    func getClientAppointments(clientId: UUID) async throws -> [Appointment] {
+        let response: APIResponse<[Appointment]> = try await request(path: "/clients/\(clientId)/appointments")
+        return response.data ?? []
+    }
+    
+    // MARK: - Services
+    
+    func getServices() async throws -> [Service] {
+        let response: APIResponse<[Service]> = try await request(path: "/services")
+        return response.data ?? []
+    }
+    
+    func createService(_ service: Service) async throws -> Service {
+        let response: APIResponse<Service> = try await request(path: "/services", method: "POST", body: service)
+        guard let created = response.data else { throw APIError.invalidResponse }
+        return created
+    }
+    
+    func updateService(id: UUID, _ service: Service) async throws -> Service {
+        let response: APIResponse<Service> = try await request(path: "/services/\(id)", method: "PUT", body: service)
+        guard let updated = response.data else { throw APIError.invalidResponse }
+        return updated
+    }
+    
+    func deleteService(id: UUID) async throws {
+        try await requestNoContent(path: "/services/\(id)", method: "DELETE")
+    }
+    
+    // MARK: - Appointments
+    
+    func getAppointments(date: String? = nil) async throws -> [Appointment] {
+        var queryItems: [URLQueryItem]? = nil
+        if let date {
+            queryItems = [URLQueryItem(name: "date", value: date)]
+        }
+        let response: APIResponse<[Appointment]> = try await request(path: "/appointments", queryItems: queryItems)
+        return response.data ?? []
+    }
+    
+    func getAppointment(id: UUID) async throws -> Appointment {
+        let response: APIResponse<Appointment> = try await request(path: "/appointments/\(id)")
+        guard let appointment = response.data else { throw APIError.invalidResponse }
+        return appointment
+    }
+    
+    func createAppointment(_ request: CreateAppointmentRequest) async throws -> Appointment {
+        let response: APIResponse<Appointment> = try await self.request(path: "/appointments", method: "POST", body: request)
+        guard let created = response.data else { throw APIError.invalidResponse }
+        return created
+    }
+    
+    func updateAppointment(id: UUID, _ request: UpdateAppointmentRequest) async throws -> Appointment {
+        let response: APIResponse<Appointment> = try await self.request(path: "/appointments/\(id)", method: "PUT", body: request)
+        guard let updated = response.data else { throw APIError.invalidResponse }
+        return updated
+    }
+    
+    func deleteAppointment(id: UUID) async throws {
+        try await requestNoContent(path: "/appointments/\(id)", method: "DELETE")
+    }
+    
+    // MARK: - Dashboard
+    
+    func getDashboard() async throws -> DashboardData {
+        let response: APIResponse<DashboardData> = try await request(path: "/dashboard")
+        guard let data = response.data else { throw APIError.invalidResponse }
+        return data
+    }
+    
+    func getAdvancedStats() async throws -> AdvancedStats {
+        let response: APIResponse<AdvancedStats> = try await request(path: "/dashboard/stats")
+        guard let data = response.data else { throw APIError.invalidResponse }
+        return data
+    }
+    
+    // MARK: - System
+    
+    func invalidateCache() async throws {
+        try await requestNoContent(path: "/cache/invalidate", method: "POST")
+    }
+}
