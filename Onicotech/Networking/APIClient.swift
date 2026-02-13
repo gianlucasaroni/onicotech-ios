@@ -23,12 +23,52 @@ enum APIError: LocalizedError {
     }
 }
 
+// MARK: - Auth Models
+struct AuthResponse: Codable {
+    let token: String
+    let user: User
+}
+
+struct User: Codable {
+    let id: UUID
+    let firstName: String
+    let lastName: String
+    let email: String
+}
+
+// MARK: - API Client
 actor APIClient {
     static let shared = APIClient()
     
+    // ... (rest of props)
+
+    // MARK: - Auth
+    func login(email: String, password: String) async throws -> AuthResponse {
+        let body = ["email": email, "password": password]
+        return try await request(path: "/auth/login", method: "POST", body: body)
+    }
+    
+    func register(firstName: String, lastName: String, email: String, password: String) async throws -> AuthResponse {
+        let body = [
+            "firstName": firstName,
+            "lastName": lastName,
+            "email": email,
+            "password": password
+        ]
+        return try await request(path: "/auth/register", method: "POST", body: body)
+    }
+    
+    func getProfile() async throws -> User {
+        let response: APIResponse<User> = try await request(path: "/me")
+        guard let user = response.data else { throw APIError.invalidResponse }
+        return user
+    }
+    
+    // ... (rest of methods)
+    
     // MARK: - Change this to your backend URL
-    //private let baseURL = "http://onicotech.pve.local:8282/api/v1"
-    private let baseURL = "http://172.20.10.2:8282/api/v1"
+    //static let baseServerURL = "http://192.168.1.42:8282/api/v1"
+    static let baseServerURL = "https://onicotech.pve.local:8282/api/v1"
     
     private let decoder: JSONDecoder = {
         let decoder = JSONDecoder()
@@ -50,7 +90,7 @@ actor APIClient {
         body: (any Encodable)? = nil,
         queryItems: [URLQueryItem]? = nil
     ) async throws -> T {
-        guard var urlComponents = URLComponents(string: "\(baseURL)\(path)") else {
+        guard var urlComponents = URLComponents(string: "\(APIClient.baseServerURL)\(path)") else {
             throw APIError.invalidURL
         }
         
@@ -65,6 +105,11 @@ actor APIClient {
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = method
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        // Add Auth Token
+        if let token = UserDefaults.standard.string(forKey: "authToken") {
+            urlRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
         
         if let body {
             urlRequest.httpBody = try encoder.encode(body)
@@ -111,7 +156,7 @@ actor APIClient {
         path: String,
         method: String
     ) async throws {
-        guard let url = URL(string: "\(baseURL)\(path)") else {
+        guard let url = URL(string: "\(APIClient.baseServerURL)\(path)") else {
             throw APIError.invalidURL
         }
         
@@ -139,23 +184,27 @@ actor APIClient {
     
     // MARK: - Clients
     
+    @MainActor
     func getClients() async throws -> [Client] {
         let response: APIResponse<[Client]> = try await request(path: "/clients")
         return response.data ?? []
     }
     
+    @MainActor
     func getClient(id: UUID) async throws -> Client {
         let response: APIResponse<Client> = try await request(path: "/clients/\(id)")
         guard let client = response.data else { throw APIError.invalidResponse }
         return client
     }
     
+    @MainActor
     func createClient(_ client: Client) async throws -> Client {
         let response: APIResponse<Client> = try await request(path: "/clients", method: "POST", body: client)
         guard let created = response.data else { throw APIError.invalidResponse }
         return created
     }
     
+    @MainActor
     func updateClient(id: UUID, _ client: Client) async throws -> Client {
         let response: APIResponse<Client> = try await request(path: "/clients/\(id)", method: "PUT", body: client)
         guard let updated = response.data else { throw APIError.invalidResponse }
@@ -168,22 +217,24 @@ actor APIClient {
     
     func getClientAppointments(clientId: UUID) async throws -> [Appointment] {
         let response: APIResponse<[Appointment]> = try await request(path: "/clients/\(clientId)/appointments")
-        return response.data ?? []
+        return await response.data ?? []
     }
     
     // MARK: - Services
     
     func getServices() async throws -> [Service] {
         let response: APIResponse<[Service]> = try await request(path: "/services")
-        return response.data ?? []
+        return await response.data ?? []
     }
     
+    @MainActor
     func createService(_ service: Service) async throws -> Service {
         let response: APIResponse<Service> = try await request(path: "/services", method: "POST", body: service)
         guard let created = response.data else { throw APIError.invalidResponse }
         return created
     }
     
+    @MainActor
     func updateService(id: UUID, _ service: Service) async throws -> Service {
         let response: APIResponse<Service> = try await request(path: "/services/\(id)", method: "PUT", body: service)
         guard let updated = response.data else { throw APIError.invalidResponse }
@@ -195,7 +246,7 @@ actor APIClient {
     }
     
     // MARK: - Appointments
-    
+    @MainActor
     func getAppointments(date: String? = nil) async throws -> [Appointment] {
         var queryItems: [URLQueryItem]? = nil
         if let date {
@@ -205,36 +256,41 @@ actor APIClient {
         return response.data ?? []
     }
     
+    @MainActor
     func getAppointment(id: UUID) async throws -> Appointment {
         let response: APIResponse<Appointment> = try await request(path: "/appointments/\(id)")
         guard let appointment = response.data else { throw APIError.invalidResponse }
         return appointment
     }
     
+    @MainActor
     func createAppointment(_ request: CreateAppointmentRequest) async throws -> Appointment {
         let response: APIResponse<Appointment> = try await self.request(path: "/appointments", method: "POST", body: request)
         guard let created = response.data else { throw APIError.invalidResponse }
         return created
     }
     
+    @MainActor
     func updateAppointment(id: UUID, _ request: UpdateAppointmentRequest) async throws -> Appointment {
         let response: APIResponse<Appointment> = try await self.request(path: "/appointments/\(id)", method: "PUT", body: request)
         guard let updated = response.data else { throw APIError.invalidResponse }
         return updated
     }
     
+    @MainActor
     func deleteAppointment(id: UUID) async throws {
         try await requestNoContent(path: "/appointments/\(id)", method: "DELETE")
     }
     
     // MARK: - Dashboard
-    
+    @MainActor
     func getDashboard() async throws -> DashboardData {
         let response: APIResponse<DashboardData> = try await request(path: "/dashboard")
         guard let data = response.data else { throw APIError.invalidResponse }
         return data
     }
     
+    @MainActor
     func getAdvancedStats() async throws -> AdvancedStats {
         let response: APIResponse<AdvancedStats> = try await request(path: "/dashboard/stats")
         guard let data = response.data else { throw APIError.invalidResponse }
@@ -248,14 +304,19 @@ actor APIClient {
     }
     
     // MARK: - Photos
-    
+    @MainActor
     func uploadPhoto(appointmentId: UUID, image: Data, type: String) async throws -> Photo {
-        let url = URL(string: "\(baseURL)/appointments/\(appointmentId)/photos")!
+        let url = URL(string: "\(APIClient.baseServerURL)/appointments/\(appointmentId)/photos")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         
         let boundary = "Boundary-\(UUID().uuidString)"
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        
+        // Add Auth Token
+        if let token = UserDefaults.standard.string(forKey: "authToken") {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
         
         var body = Data()
         
@@ -298,15 +359,18 @@ actor APIClient {
         try await requestNoContent(path: "/photos/\(id)", method: "DELETE")
     }
     
+    @MainActor
     func getAppointmentPhotos(appointmentId: UUID) async throws -> [Photo] {
         let endpoint = "appointments/\(appointmentId.uuidString)/photos"
         let response: APIResponse<[Photo]> = try await request(path: "/\(endpoint)") // Assuming 'request' is the general method and 'path' expects a leading slash
         return response.data ?? []
     }
     
+    @MainActor
     func getClientPhotos(clientId: UUID) async throws -> [Photo] {
         let endpoint = "clients/\(clientId.uuidString)/photos"
         let response: APIResponse<[Photo]> = try await request(path: "/\(endpoint)") // Assuming 'request' is the general method and 'path' expects a leading slash
         return response.data ?? []
     }
 }
+

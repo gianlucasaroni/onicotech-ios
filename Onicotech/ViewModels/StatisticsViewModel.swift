@@ -2,6 +2,7 @@ import Foundation
 import Observation
 
 @Observable
+@MainActor
 class StatisticsViewModel {
     var stats: AdvancedStats?
     var isLoading = false

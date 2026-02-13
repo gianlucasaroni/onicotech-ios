@@ -2,6 +2,7 @@ import Foundation
 import Observation
 
 @Observable
+@MainActor
 class ClientViewModel {
     var clients: [Client] = []
     var isLoading = false

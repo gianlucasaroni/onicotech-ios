@@ -10,7 +10,7 @@ struct StatisticsView: View {
                 if viewModel.isLoading {
                     ProgressView("Caricamento statistiche...")
                         .padding(.top, 50)
-                } else if let stats = viewModel.stats {
+                } else if let stats = viewModel.stats, !stats.isEmpty {
                     // Revenue Chart
                     if let revenue = stats.monthlyRevenue, !revenue.isEmpty {
                         ChartCard(title: "Andamento Fatturato (12 Mesi)") {

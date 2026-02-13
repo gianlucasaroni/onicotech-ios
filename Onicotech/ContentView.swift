@@ -2,39 +2,45 @@ import SwiftUI
 internal import EventKit
 
 struct ContentView: View {
+    @EnvironmentObject var authManager: AuthenticationManager
+    
     var body: some View {
-        TabView {
-            Tab("Home", systemImage: "house") {
-                NavigationStack {
-                    DashboardView()
+        if authManager.isAuthenticated {
+            TabView {
+                Tab("Home", systemImage: "house") {
+                    NavigationStack {
+                        DashboardView()
+                    }
+                }
+                
+                Tab("Appuntamenti", systemImage: "calendar") {
+                    NavigationStack {
+                        AppointmentListView()
+                    }
+                }
+                
+                Tab("Clienti", systemImage: "person.2") {
+                    NavigationStack {
+                        ClientListView()
+                    }
+                }
+                
+                Tab("Servizi", systemImage: "sparkles") {
+                    NavigationStack {
+                        ServiceListView()
+                    }
+                }
+                
+                Tab("Impostazioni", systemImage: "gear") {
+                    NavigationStack {
+                        SettingsView()
+                    }
                 }
             }
-            
-            Tab("Appuntamenti", systemImage: "calendar") {
-                NavigationStack {
-                    AppointmentListView()
-                }
-            }
-            
-            Tab("Clienti", systemImage: "person.2") {
-                NavigationStack {
-                    ClientListView()
-                }
-            }
-            
-            Tab("Servizi", systemImage: "sparkles") {
-                NavigationStack {
-                    ServiceListView()
-                }
-            }
-            
-            Tab("Impostazioni", systemImage: "gear") {
-                NavigationStack {
-                    SettingsView()
-                }
-            }
+            .tabViewStyle(.sidebarAdaptable)
+        } else {
+            LoginView()
         }
-        .tabViewStyle(.sidebarAdaptable)
     }
 }
 

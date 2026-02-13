@@ -2,6 +2,7 @@ import Foundation
 import Observation
 
 @Observable
+@MainActor
 class DashboardViewModel {
     var data: DashboardData?
     var isLoading = false

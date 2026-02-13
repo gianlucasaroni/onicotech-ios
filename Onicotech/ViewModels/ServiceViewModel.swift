@@ -2,6 +2,7 @@ import Foundation
 import Observation
 
 @Observable
+@MainActor
 class ServiceViewModel {
     var services: [Service] = []
     var isLoading = false

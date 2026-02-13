@@ -1,10 +1,12 @@
 import SwiftUI
 
 struct DashboardView: View {
+    @EnvironmentObject var authManager: AuthenticationManager
     @State private var viewModel = DashboardViewModel()
     @State private var appointmentViewModel = AppointmentViewModel()
     
     var body: some View {
+// ... (keep body content same until headerView) ...
         ScrollView {
             VStack(spacing: 20) {
                 // Header
@@ -43,8 +45,8 @@ struct DashboardView: View {
                         }
                         Spacer()
                         Image(systemName: "chart.xyaxis.line")
-                            .font(.title)
-                            .foregroundStyle(.white)
+                        .font(.title)
+                        .foregroundStyle(.white)
                     }
                     .padding()
                     .background(LinearGradient(colors: [.purple, .blue], startPoint: .topLeading, endPoint: .bottomTrailing))
@@ -108,9 +110,15 @@ struct DashboardView: View {
                 Text(Date.now.formatted(date: .complete, time: .omitted))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                Text("Benvenuta 👋")
-                    .font(.largeTitle)
-                    .bold()
+                if let firstName = authManager.user?.firstName {
+                     Text("Ciao \(firstName) 👋")
+                        .font(.largeTitle)
+                        .bold()
+                } else {
+                     Text("Ciao 👋")
+                        .font(.largeTitle)
+                        .bold()
+                }
             }
             Spacer()
         }

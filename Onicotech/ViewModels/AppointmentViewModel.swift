@@ -5,6 +5,7 @@ import SwiftUI
 import Combine
 
 @Observable
+@MainActor
 class AppointmentViewModel {
     var appointments: [Appointment] = []
     var isLoading = false

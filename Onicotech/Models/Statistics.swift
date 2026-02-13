@@ -7,6 +7,15 @@ struct AdvancedStats: Codable {
     let flopSpenders: [TopSpender]?
     let flopServices: [TopService]?
     let unreliableClients: [UnreliableClient]?
+    
+    var isEmpty: Bool {
+        (topSpenders?.isEmpty ?? true) &&
+        (topServices?.isEmpty ?? true) &&
+        (monthlyRevenue?.isEmpty ?? true) &&
+        (flopSpenders?.isEmpty ?? true) &&
+        (flopServices?.isEmpty ?? true) &&
+        (unreliableClients?.isEmpty ?? true)
+    }
 }
 
 struct TopSpender: Codable, Identifiable {

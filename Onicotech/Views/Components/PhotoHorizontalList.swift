@@ -1,5 +1,6 @@
 
 import SwiftUI
+import Kingfisher
 
 struct PhotoHorizontalList: View {
     let photos: [Photo]
@@ -27,29 +28,18 @@ struct PhotoHorizontalList: View {
                     }
                     
                     ForEach(photos) { photo in
-                        AsyncImage(url: URL(string: photo.thumbnailUrl ?? photo.url)) { phase in
-                            switch phase {
-                            case .empty:
+                        KFImage(URL(string: photo.fullThumbnailUrl))
+                            .placeholder {
                                 ProgressView()
                                     .frame(width: 80, height: 80)
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: 80, height: 80)
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                                    .onTapGesture {
-                                        onPhotoSelected(photo)
-                                    }
-                            case .failure:
-                                Image(systemName: "photo")
-                                    .frame(width: 80, height: 80)
-                                    .background(Color.gray.opacity(0.1))
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                            @unknown default:
-                                EmptyView()
                             }
-                        }
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 80, height: 80)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .onTapGesture {
+                                onPhotoSelected(photo)
+                            }
                     }
                 }
             }

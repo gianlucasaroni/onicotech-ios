@@ -1,4 +1,5 @@
 import SwiftUI
+import Kingfisher
 
 struct AppointmentDetailView: View {
     let appointmentId: UUID
@@ -142,35 +143,25 @@ struct AppointmentDetailView: View {
                             
                             ForEach(photos) { photo in
                                 // List uses Thumbnail (fallback to original if missing)
-                                AsyncImage(url: URL(string: photo.thumbnailUrl ?? photo.url)) { phase in
-                                    switch phase {
-                                    case .empty:
+                                KFImage(URL(string: photo.fullThumbnailUrl))
+                                    .placeholder {
                                         ProgressView()
                                             .frame(width: 100, height: 100)
-                                    case .success(let image):
-                                        image
-                                            .resizable()
-                                            .scaledToFill()
-                                            .frame(width: 100, height: 100)
-                                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                                            .onTapGesture {
-                                                selectedPhoto = photo
-                                            }
-                                            .contextMenu {
-                                                Button(role: .destructive) {
-                                                    deletePhoto(photo)
-                                                } label: {
-                                                    Label("Elimina", systemImage: "trash")
-                                                }
-                                            }
-                                    case .failure:
-                                        Image(systemName: "photo")
-                                            .frame(width: 100, height: 100)
-                                            .background(Color.gray.opacity(0.1))
-                                    @unknown default:
-                                        EmptyView()
                                     }
-                                }
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: 100, height: 100)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    .onTapGesture {
+                                        selectedPhoto = photo
+                                    }
+                                    .contextMenu {
+                                        Button(role: .destructive) {
+                                            deletePhoto(photo)
+                                        } label: {
+                                            Label("Elimina", systemImage: "trash")
+                                        }
+                                    }
                             }
                         }
                         .padding(.vertical, 8)
@@ -319,7 +310,7 @@ struct PhotoGalleryViewer: View {
         NavigationStack {
             TabView(selection: $selection) {
                 ForEach(photos) { photo in
-                    ZoomableImageView(url: URL(string: photo.url))
+                    ZoomableImageView(url: URL(string: photo.fullOriginalUrl))
                         .tag(photo)
                 }
             }
@@ -364,19 +355,10 @@ struct ZoomableImageView: UIViewRepresentable {
         context.coordinator.imageView = imageView
         
         // Load Image
+        // Load Image with Kingfisher
         if let url {
-            Task {
-                do {
-                    let (data, _) = try await URLSession.shared.data(from: url)
-                    if let image = UIImage(data: data) {
-                        await MainActor.run {
-                            imageView.image = image
-                        }
-                    }
-                } catch {
-                    print("Failed to load image for zoom: \(error)")
-                }
-            }
+            imageView.kf.indicatorType = .activity
+            imageView.kf.setImage(with: url)
         }
         
         return scrollView
