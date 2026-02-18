@@ -1,6 +1,7 @@
 import SwiftUI
 import PhotosUI
 
+#if os(iOS)
 struct ImagePicker: UIViewControllerRepresentable {
     @Binding var image: UIImage?
     @Environment(\.presentationMode) private var presentationMode
@@ -45,3 +46,44 @@ struct ImagePicker: UIViewControllerRepresentable {
         }
     }
 }
+#endif
+
+#if os(macOS)
+struct ImagePicker: View {
+    @Binding var imageData: Data?
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            Text("Seleziona un'immagine")
+                .font(.headline)
+            
+            Button("Scegli file...") {
+                selectFile()
+            }
+            .buttonStyle(.borderedProminent)
+            
+            Button("Annulla") {
+                dismiss()
+            }
+        }
+        .padding(40)
+        .frame(minWidth: 300, minHeight: 200)
+        .onAppear {
+            selectFile()
+        }
+    }
+    
+    private func selectFile() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.image]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        
+        if panel.runModal() == .OK, let url = panel.url {
+            imageData = try? Data(contentsOf: url)
+            dismiss()
+        }
+    }
+}
+#endif

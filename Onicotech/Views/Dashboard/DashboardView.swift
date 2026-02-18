@@ -75,7 +75,7 @@ struct DashboardView: View {
                                 NavigationLink(destination: AppointmentDetailView(appointmentId: appointment.id!, initialAppointment: appointment, viewModel: appointmentViewModel)) {
                                     AppointmentRowView(appointment: appointment)
                                         .padding()
-                                        .background(Color(.systemBackground))
+                                        .background(Color.systemBackgroundCompat)
                                         .clipShape(RoundedRectangle(cornerRadius: 12))
                                         .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
                                 }
@@ -90,7 +90,7 @@ struct DashboardView: View {
         }
         .navigationTitle("Dashboard")
         .inlineNavigationTitle()
-        .background(Color(.systemGroupedBackground))
+        .background(Color.groupedBackgroundCompat)
         .task {
             await viewModel.loadData()
         }
@@ -156,7 +156,7 @@ struct StatCard: View {
                 .foregroundStyle(color)
         }
         .padding(12)
-        .background(Color(.systemBackground))
+        .background(Color.systemBackgroundCompat)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
     }

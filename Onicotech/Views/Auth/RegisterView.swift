@@ -38,8 +38,10 @@ struct RegisterView: View {
                     
                     TextField("Email", text: $email)
                         .textFieldStyle(.roundedBorder)
+                        #if os(iOS)
                         .textInputAutocapitalization(.never)
                         .keyboardType(.emailAddress)
+                        #endif
                         .textContentType(.emailAddress)
                     
                     SecureField("Password", text: $password)

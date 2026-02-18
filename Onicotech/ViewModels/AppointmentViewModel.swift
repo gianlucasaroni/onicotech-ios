@@ -138,7 +138,7 @@ class CalendarManager: ObservableObject {
                 granted = try await eventStore.requestAccess(to: .event)
             }
             if granted {
-                await fetchCalendars()
+                fetchCalendars()
             }
             return granted
         } catch {

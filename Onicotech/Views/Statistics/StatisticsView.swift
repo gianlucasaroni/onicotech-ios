@@ -60,7 +60,7 @@ struct StatisticsView: View {
                                         .foregroundStyle(.green)
                                 }
                                 .padding()
-                                .background(Color(.secondarySystemGroupedBackground))
+                                .background(Color.secondaryGroupedBackgroundCompat)
                                 .clipShape(RoundedRectangle(cornerRadius: 12))
                                 .padding(.horizontal)
                             }
@@ -87,7 +87,7 @@ struct StatisticsView: View {
                                         .foregroundStyle(.orange)
                                 }
                                 .padding()
-                                .background(Color(.secondarySystemGroupedBackground))
+                                .background(Color.secondaryGroupedBackgroundCompat)
                                 .clipShape(RoundedRectangle(cornerRadius: 12))
                                 .padding(.horizontal)
                             }
@@ -134,7 +134,7 @@ struct StatisticsView: View {
                                         .clipShape(Circle())
                                 }
                                 .padding()
-                                .background(Color(.secondarySystemGroupedBackground))
+                                .background(Color.secondaryGroupedBackgroundCompat)
                                 .clipShape(RoundedRectangle(cornerRadius: 12))
                                 .padding(.horizontal)
                             }
@@ -147,7 +147,7 @@ struct StatisticsView: View {
             .padding(.vertical)
         }
         .navigationTitle("Statistiche Avanzate")
-        .background(Color(.systemGroupedBackground))
+        .background(Color.groupedBackgroundCompat)
         .task {
             await viewModel.loadStats()
         }
@@ -179,7 +179,7 @@ struct ChartCard<Content: View>: View {
             content
         }
         .padding()
-        .background(Color(.secondarySystemGroupedBackground))
+        .background(Color.secondaryGroupedBackgroundCompat)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
         .padding(.horizontal)

@@ -155,9 +155,15 @@ struct ClientDetailView: View {
                 ClientFormView(viewModel: clientViewModel, client: client)
             }
         }
+        #if os(iOS)
         .fullScreenCover(item: $selectedPhoto) { photo in
             PhotoGalleryViewer(photos: photos, initialPhoto: photo)
         }
+        #else
+        .sheet(item: $selectedPhoto) { photo in
+            PhotoGalleryViewer(photos: photos, initialPhoto: photo)
+        }
+        #endif
         .sheet(isPresented: $showingAddAppointmentSheet) {
             Task { await loadAppointments() }
         } content: {

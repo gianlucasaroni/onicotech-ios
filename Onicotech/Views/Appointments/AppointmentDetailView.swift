@@ -1,5 +1,10 @@
 import SwiftUI
 import Kingfisher
+#if canImport(UIKit)
+import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 struct AppointmentDetailView: View {
     let appointmentId: UUID
@@ -193,14 +198,27 @@ struct AppointmentDetailView: View {
             AppointmentFormView(viewModel: viewModel, appointment: appointment)
         }
         .sheet(isPresented: $showImagePicker) {
+            #if os(iOS)
             ImagePicker(image: $inputImage)
+            #else
+            ImagePicker(imageData: $inputImageData)
+            #endif
         }
+        #if os(iOS)
         .fullScreenCover(item: $selectedPhoto) { photo in
             PhotoGalleryViewer(photos: photos, initialPhoto: photo)
         }
-        .onChange(of: inputImage) { _ in
+        .onChange(of: inputImage) {
             uploadSelectedImage()
         }
+        #else
+        .sheet(item: $selectedPhoto) { photo in
+            PhotoGalleryViewer(photos: photos, initialPhoto: photo)
+        }
+        .onChange(of: inputImageData) {
+            uploadSelectedImage()
+        }
+        #endif
         .task {
             await loadPhotos()
         }
@@ -209,7 +227,11 @@ struct AppointmentDetailView: View {
     @State private var photos: [Photo] = []
     @State private var selectedPhoto: Photo?
     @State private var showImagePicker = false
+    #if os(iOS)
     @State private var inputImage: UIImage?
+    #else
+    @State private var inputImageData: Data?
+    #endif
     @State private var isUploading = false
     
     private func loadPhotos() async {
@@ -221,21 +243,25 @@ struct AppointmentDetailView: View {
     }
     
     private func uploadSelectedImage() {
+        #if os(iOS)
         guard let inputImage = inputImage else { return }
         guard let imageData = inputImage.jpegData(compressionQuality: 0.8) else { return }
+        #else
+        guard let imageData = inputImageData else { return }
+        #endif
         
         isUploading = true
         Task {
             do {
-                // Determine type based on date? Or prompt user? For now default to "result" (after)
-                // Or "other".
-                // Simple implementation: just upload.
                 let newPhoto = try await APIClient.shared.uploadPhoto(appointmentId: appointmentId, image: imageData, type: "after")
                 
-                // Add to list immediately
                 await MainActor.run {
                     photos.insert(newPhoto, at: 0)
+                    #if os(iOS)
                     self.inputImage = nil
+                    #else
+                    self.inputImageData = nil
+                    #endif
                     isUploading = false
                 }
             } catch {
@@ -308,6 +334,7 @@ struct PhotoGalleryViewer: View {
     
     var body: some View {
         NavigationStack {
+            #if os(iOS)
             TabView(selection: $selection) {
                 ForEach(photos) { photo in
                     ZoomableImageView(url: URL(string: photo.fullOriginalUrl))
@@ -315,19 +342,32 @@ struct PhotoGalleryViewer: View {
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: .always))
-            .background(Color.black)
-            .navigationTitle("Galleria")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Chiudi") { dismiss() }
+            #else
+            TabView(selection: $selection) {
+                ForEach(photos) { photo in
+                    KFImage(URL(string: photo.fullOriginalUrl))
+                        .resizable()
+                        .scaledToFit()
+                        .tag(photo)
                 }
             }
-            .preferredColorScheme(.dark)
+            #endif
         }
+        .background(Color.black)
+        .navigationTitle("Galleria")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Chiudi") { dismiss() }
+            }
+        }
+        .preferredColorScheme(.dark)
     }
 }
 
+#if os(iOS)
 struct ZoomableImageView: UIViewRepresentable {
     let url: URL?
     
@@ -354,8 +394,6 @@ struct ZoomableImageView: UIViewRepresentable {
         
         context.coordinator.imageView = imageView
         
-        // Load Image
-        // Load Image with Kingfisher
         if let url {
             imageView.kf.indicatorType = .activity
             imageView.kf.setImage(with: url)
@@ -378,3 +416,4 @@ struct ZoomableImageView: UIViewRepresentable {
         }
     }
 }
+#endif

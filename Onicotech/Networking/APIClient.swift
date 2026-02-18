@@ -4,8 +4,8 @@ enum APIError: LocalizedError {
     case invalidURL
     case invalidResponse
     case serverError(String)
-    case decodingError(Error)
-    case networkError(Error)
+    case decodingError(String)
+    case networkError(String)
     
     var errorDescription: String? {
         switch self {
@@ -15,10 +15,10 @@ enum APIError: LocalizedError {
             return "Risposta del server non valida"
         case .serverError(let message):
             return message
-        case .decodingError:
-            return "Errore nella lettura dei dati"
-        case .networkError(let error):
-            return "Errore di rete: \(error.localizedDescription)"
+        case .decodingError(let message):
+            return "Errore nella lettura dei dati: \(message)"
+        case .networkError(let message):
+            return "Errore di rete: \(message)"
         }
     }
 }
@@ -37,11 +37,26 @@ struct User: Codable {
 }
 
 // MARK: - API Client
-actor APIClient {
+@MainActor
+final class APIClient {
     static let shared = APIClient()
     
-    // ... (rest of props)
-
+    // MARK: - Change this to your backend URL
+    //static let baseServerURL = "http://192.168.1.42:8282/api/v1"
+    static let baseServerURL = "http://192.168.1.14:8282/api/v1"
+    
+    private let decoder: JSONDecoder = {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return decoder
+    }()
+    
+    private let encoder: JSONEncoder = {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        return encoder
+    }()
+    
     // MARK: - Auth
     func login(email: String, password: String) async throws -> AuthResponse {
         let body = ["email": email, "password": password]
@@ -63,24 +78,6 @@ actor APIClient {
         guard let user = response.data else { throw APIError.invalidResponse }
         return user
     }
-    
-    // ... (rest of methods)
-    
-    // MARK: - Change this to your backend URL
-    //static let baseServerURL = "http://192.168.1.42:8282/api/v1"
-    static let baseServerURL = "https://onicotech.pve.local:8282/api/v1"
-    
-    private let decoder: JSONDecoder = {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return decoder
-    }()
-    
-    private let encoder: JSONEncoder = {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        return encoder
-    }()
     
     // MARK: - Generic Request
     
@@ -119,7 +116,7 @@ actor APIClient {
         do {
             (data, response) = try await URLSession.shared.data(for: urlRequest)
         } catch {
-            throw APIError.networkError(error)
+            throw APIError.networkError(error.localizedDescription)
         }
         
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -128,10 +125,6 @@ actor APIClient {
         
         if httpResponse.statusCode == 204 {
             // No Content — return a placeholder for Void-like responses
-            if let empty = Optional<T>.none as? T {
-                return empty
-            }
-            // Try to decode empty response
             let emptyJSON = "{}".data(using: .utf8)!
             return try decoder.decode(T.self, from: emptyJSON)
         }
@@ -146,7 +139,7 @@ actor APIClient {
         do {
             return try decoder.decode(T.self, from: data)
         } catch {
-            throw APIError.decodingError(error)
+            throw APIError.decodingError(error.localizedDescription)
         }
     }
     
@@ -163,11 +156,16 @@ actor APIClient {
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = method
         
+        // Add Auth Token
+        if let token = UserDefaults.standard.string(forKey: "authToken") {
+            urlRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        
         let (data, response): (Data, URLResponse)
         do {
             (data, response) = try await URLSession.shared.data(for: urlRequest)
         } catch {
-            throw APIError.networkError(error)
+            throw APIError.networkError(error.localizedDescription)
         }
         
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -184,27 +182,23 @@ actor APIClient {
     
     // MARK: - Clients
     
-    @MainActor
     func getClients() async throws -> [Client] {
         let response: APIResponse<[Client]> = try await request(path: "/clients")
         return response.data ?? []
     }
     
-    @MainActor
     func getClient(id: UUID) async throws -> Client {
         let response: APIResponse<Client> = try await request(path: "/clients/\(id)")
         guard let client = response.data else { throw APIError.invalidResponse }
         return client
     }
     
-    @MainActor
     func createClient(_ client: Client) async throws -> Client {
         let response: APIResponse<Client> = try await request(path: "/clients", method: "POST", body: client)
         guard let created = response.data else { throw APIError.invalidResponse }
         return created
     }
     
-    @MainActor
     func updateClient(id: UUID, _ client: Client) async throws -> Client {
         let response: APIResponse<Client> = try await request(path: "/clients/\(id)", method: "PUT", body: client)
         guard let updated = response.data else { throw APIError.invalidResponse }
@@ -217,24 +211,22 @@ actor APIClient {
     
     func getClientAppointments(clientId: UUID) async throws -> [Appointment] {
         let response: APIResponse<[Appointment]> = try await request(path: "/clients/\(clientId)/appointments")
-        return await response.data ?? []
+        return response.data ?? []
     }
     
     // MARK: - Services
     
     func getServices() async throws -> [Service] {
         let response: APIResponse<[Service]> = try await request(path: "/services")
-        return await response.data ?? []
+        return response.data ?? []
     }
     
-    @MainActor
     func createService(_ service: Service) async throws -> Service {
         let response: APIResponse<Service> = try await request(path: "/services", method: "POST", body: service)
         guard let created = response.data else { throw APIError.invalidResponse }
         return created
     }
     
-    @MainActor
     func updateService(id: UUID, _ service: Service) async throws -> Service {
         let response: APIResponse<Service> = try await request(path: "/services/\(id)", method: "PUT", body: service)
         guard let updated = response.data else { throw APIError.invalidResponse }
@@ -246,7 +238,7 @@ actor APIClient {
     }
     
     // MARK: - Appointments
-    @MainActor
+    
     func getAppointments(date: String? = nil) async throws -> [Appointment] {
         var queryItems: [URLQueryItem]? = nil
         if let date {
@@ -256,41 +248,36 @@ actor APIClient {
         return response.data ?? []
     }
     
-    @MainActor
     func getAppointment(id: UUID) async throws -> Appointment {
         let response: APIResponse<Appointment> = try await request(path: "/appointments/\(id)")
         guard let appointment = response.data else { throw APIError.invalidResponse }
         return appointment
     }
     
-    @MainActor
     func createAppointment(_ request: CreateAppointmentRequest) async throws -> Appointment {
         let response: APIResponse<Appointment> = try await self.request(path: "/appointments", method: "POST", body: request)
         guard let created = response.data else { throw APIError.invalidResponse }
         return created
     }
     
-    @MainActor
     func updateAppointment(id: UUID, _ request: UpdateAppointmentRequest) async throws -> Appointment {
         let response: APIResponse<Appointment> = try await self.request(path: "/appointments/\(id)", method: "PUT", body: request)
         guard let updated = response.data else { throw APIError.invalidResponse }
         return updated
     }
     
-    @MainActor
     func deleteAppointment(id: UUID) async throws {
         try await requestNoContent(path: "/appointments/\(id)", method: "DELETE")
     }
     
     // MARK: - Dashboard
-    @MainActor
+    
     func getDashboard() async throws -> DashboardData {
         let response: APIResponse<DashboardData> = try await request(path: "/dashboard")
         guard let data = response.data else { throw APIError.invalidResponse }
         return data
     }
     
-    @MainActor
     func getAdvancedStats() async throws -> AdvancedStats {
         let response: APIResponse<AdvancedStats> = try await request(path: "/dashboard/stats")
         guard let data = response.data else { throw APIError.invalidResponse }
@@ -304,7 +291,7 @@ actor APIClient {
     }
     
     // MARK: - Photos
-    @MainActor
+    
     func uploadPhoto(appointmentId: UUID, image: Data, type: String) async throws -> Photo {
         let url = URL(string: "\(APIClient.baseServerURL)/appointments/\(appointmentId)/photos")!
         var request = URLRequest(url: url)
@@ -359,18 +346,13 @@ actor APIClient {
         try await requestNoContent(path: "/photos/\(id)", method: "DELETE")
     }
     
-    @MainActor
     func getAppointmentPhotos(appointmentId: UUID) async throws -> [Photo] {
-        let endpoint = "appointments/\(appointmentId.uuidString)/photos"
-        let response: APIResponse<[Photo]> = try await request(path: "/\(endpoint)") // Assuming 'request' is the general method and 'path' expects a leading slash
+        let response: APIResponse<[Photo]> = try await request(path: "/appointments/\(appointmentId.uuidString)/photos")
         return response.data ?? []
     }
     
-    @MainActor
     func getClientPhotos(clientId: UUID) async throws -> [Photo] {
-        let endpoint = "clients/\(clientId.uuidString)/photos"
-        let response: APIResponse<[Photo]> = try await request(path: "/\(endpoint)") // Assuming 'request' is the general method and 'path' expects a leading slash
+        let response: APIResponse<[Photo]> = try await request(path: "/clients/\(clientId.uuidString)/photos")
         return response.data ?? []
     }
 }
-
