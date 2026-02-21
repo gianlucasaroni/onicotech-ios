@@ -33,6 +33,7 @@ struct ClientDetailView: View {
     @State private var showingAddAppointmentSheet = false
     @State private var selectedAppointment: Appointment?
     @State private var appointmentViewModel = AppointmentViewModel()
+    @State private var allPromotions: [Promotion] = []
     
     private var filteredAppointments: [Appointment] {
         let today = currentDateString()
@@ -87,6 +88,33 @@ struct ClientDetailView: View {
                 }
             } header: {
                 Text("Informazioni")
+            }
+            
+            Section("Promozioni") {
+                let clientPromos = allPromotions.filter { client.promotionIds.contains($0.id) }
+                if clientPromos.isEmpty {
+                    Text("Nessuna promozione associata")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(clientPromos) { promo in
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(promo.name)
+                                    .font(.subheadline)
+                                if let desc = promo.description, !desc.isEmpty {
+                                    Text(desc)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            Spacer()
+                            Text("-\(Int(promo.discountPercent))%")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundStyle(.green)
+                        }
+                    }
+                }
             }
             
             Section("Galleria") {
@@ -157,11 +185,11 @@ struct ClientDetailView: View {
         }
         #if os(iOS)
         .fullScreenCover(item: $selectedPhoto) { photo in
-            PhotoGalleryViewer(photos: photos, initialPhoto: photo)
+            FullscreenPhotoViewer(photos: photos, initialPhoto: photo, title: "Galleria Cliente")
         }
         #else
         .sheet(item: $selectedPhoto) { photo in
-            PhotoGalleryViewer(photos: photos, initialPhoto: photo)
+            FullscreenPhotoViewer(photos: photos, initialPhoto: photo, title: "Galleria Cliente")
         }
         #endif
         .sheet(isPresented: $showingAddAppointmentSheet) {
@@ -178,6 +206,7 @@ struct ClientDetailView: View {
         .task {
             await loadAppointments()
             await loadPhotos()
+            await loadPromotions()
         }
     }
     
@@ -214,6 +243,14 @@ struct ClientDetailView: View {
             photos = try await APIClient.shared.getClientPhotos(clientId: clientId)
         } catch {
             print("Error loading client photos: \(error)")
+        }
+    }
+    
+    private func loadPromotions() async {
+        do {
+            allPromotions = try await APIClient.shared.getActivePromotions()
+        } catch {
+            print("Error loading promotions: \(error)")
         }
     }
     

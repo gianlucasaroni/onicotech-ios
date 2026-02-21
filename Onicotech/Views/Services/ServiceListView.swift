@@ -10,7 +10,7 @@ struct ServiceListView: View {
     var body: some View {
         Group {
             if viewModel.isLoading && viewModel.services.isEmpty {
-                ProgressView("Caricamento...")
+                ServiceListSkeletonView()
             } else if viewModel.services.isEmpty {
                 ContentUnavailableView(
                     "Nessun servizio",
@@ -119,7 +119,7 @@ struct ServiceRowView: View {
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(Color(.secondarySystemFill))
+                    .background(Color.primary.opacity(0.05))
                     .clipShape(Capsule())
                 
                 Spacer()

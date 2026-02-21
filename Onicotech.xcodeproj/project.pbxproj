@@ -14,9 +14,22 @@
 		A376C1C72F3B3BF400B6BDC3 /* Onicotech.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Onicotech.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		A38106702F48D926003D6886 /* Exceptions for "Onicotech" folder in "Onicotech" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = A376C1C62F3B3BF400B6BDC3 /* Onicotech */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		A376C1C92F3B3BF400B6BDC3 /* Onicotech */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				A38106702F48D926003D6886 /* Exceptions for "Onicotech" folder in "Onicotech" target */,
+			);
 			path = Onicotech;
 			sourceTree = "<group>";
 		};
@@ -273,10 +286,13 @@
 				ENABLE_RESOURCE_ACCESS_USB = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Onicotech/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Onicotech;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Onicotech necessita dell'accesso completo al calendario per gestire gli appuntamenti.";
 				INFOPLIST_KEY_NSCalendarsUsageDescription = "Onicotech necessita di accedere al calendario per sincronizzare gli appuntamenti.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "L'app utilizza la fotocamera per scattare foto delle ricevute e degli appuntamenti.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "L'app accede alla libreria foto per selezionare immagini delle ricevute e degli appuntamenti.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -332,10 +348,13 @@
 				ENABLE_RESOURCE_ACCESS_USB = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Onicotech/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Onicotech;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Onicotech necessita dell'accesso completo al calendario per gestire gli appuntamenti.";
 				INFOPLIST_KEY_NSCalendarsUsageDescription = "Onicotech necessita di accedere al calendario per sincronizzare gli appuntamenti.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "L'app utilizza la fotocamera per scattare foto delle ricevute e degli appuntamenti.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "L'app accede alla libreria foto per selezionare immagini delle ricevute e degli appuntamenti.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;

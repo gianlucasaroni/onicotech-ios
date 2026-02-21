@@ -8,8 +8,7 @@ struct StatisticsView: View {
         ScrollView {
             VStack(spacing: 24) {
                 if viewModel.isLoading {
-                    ProgressView("Caricamento statistiche...")
-                        .padding(.top, 50)
+                    StatisticsSkeletonView()
                 } else if let stats = viewModel.stats, !stats.isEmpty {
                     // Revenue Chart
                     if let revenue = stats.monthlyRevenue, !revenue.isEmpty {

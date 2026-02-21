@@ -25,16 +25,8 @@ struct ContentView: View {
                     }
                 }
                 
-                Tab("Servizi", systemImage: "sparkles") {
-                    NavigationStack {
-                        ServiceListView()
-                    }
-                }
-                
-                Tab("Impostazioni", systemImage: "gear") {
-                    NavigationStack {
-                        SettingsView()
-                    }
+                Tab("Gestione", systemImage: "slider.horizontal.3") {
+                    ManagementView()
                 }
             }
             .tabViewStyle(.sidebarAdaptable)

@@ -6,7 +6,7 @@ struct KingfisherConfigurator {
         let modifier = AnyModifier { request in
             var r = request
             // Retrieve token from UserDefaults (or Keychain)
-            if let token = UserDefaults.standard.string(forKey: "authToken") {
+            if let token = UserDefaults.standard.string(forKey: StorageKeys.authToken) {
                 r.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             }
             return r

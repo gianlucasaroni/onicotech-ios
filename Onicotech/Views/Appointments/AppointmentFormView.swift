@@ -1,4 +1,5 @@
 import SwiftUI
+import Foundation
 
 struct AppointmentFormView: View {
     @Environment(\.dismiss) private var dismiss
@@ -19,6 +20,8 @@ struct AppointmentFormView: View {
     // Data sources
     @State private var clients: [Client] = []
     @State private var services: [Service] = []
+    @State private var promotions: [Promotion] = []
+    @State private var selectedPromotionId: UUID?
     @State private var isLoadingData = true
     
     private var isEditing: Bool { appointment != nil }
@@ -117,15 +120,49 @@ struct AppointmentFormView: View {
                                         .filter { $0.id != nil && selectedServiceIds.contains($0.id!) }
                                         .reduce(0) { $0 + $1.duration }
                                     
-                                    HStack {
-                                        Text("Totale:")
-                                        .fontWeight(.medium)
-                                        Spacer()
-                                        let totalDecimal = Double(total) / 100.0
-                                        Text(String(format: "€%.2f · %d min", totalDecimal, totalDuration))
-                                            .fontWeight(.medium)
+                                    // Calculate Discount
+                                    let discountAmount = calculateDiscount(total: total)
+                                    let finalPrice = max(0, total - discountAmount)
+                                    
+                                    VStack(spacing: 4) {
+                                        HStack {
+                                            Text("Subtotale:")
+                                                .foregroundStyle(.secondary)
+                                            Spacer()
+                                            Text(String(format: "€%.2f", Double(total) / 100.0))
+                                                .strikethrough(discountAmount > 0)
+                                        }
+                                        
+                                        if discountAmount > 0 {
+                                            HStack {
+                                                Text("Sconto:")
+                                                    .foregroundStyle(.green)
+                                                Spacer()
+                                                Text(String(format: "-€%.2f", Double(discountAmount) / 100.0))
+                                                    .foregroundStyle(.green)
+                                            }
+                                        }
+                                        
+                                        HStack {
+                                            Text("Totale:")
+                                                .fontWeight(.medium)
+                                            Spacer()
+                                            Text(String(format: "€%.2f · %d min", Double(finalPrice) / 100.0, totalDuration))
+                                                .fontWeight(.medium)
+                                                .foregroundStyle(.blue)
+                                        }
                                     }
-                                    .foregroundStyle(.blue)
+                                    .font(.subheadline)
+                                    .padding(.top, 4)
+                                }
+                            }
+                        }
+                        
+                        Section("Promozione") {
+                            Picker("Applica Promozione", selection: $selectedPromotionId) {
+                                Text("Nessuna").tag(Optional<UUID>.none)
+                                ForEach(promotions) { promo in
+                                    Text(promo.name + " (-\(Int(promo.discountPercent))%)").tag(Optional(promo.id))
                                 }
                             }
                         }
@@ -145,6 +182,9 @@ struct AppointmentFormView: View {
                                 }
                             }
                         }
+                    }
+                    .onChange(of: selectedClientId) { _, newValue in
+                        onClientChange(newClientId: newValue)
                     }
                 }
             }
@@ -182,8 +222,10 @@ struct AppointmentFormView: View {
         do {
             async let fetchClients = APIClient.shared.getClients()
             async let fetchServices = APIClient.shared.getServices()
+            async let fetchPromotions = APIClient.shared.getActivePromotions()
             clients = try await fetchClients
             services = try await fetchServices
+            promotions = try await fetchPromotions
         } catch {
             // Silently handle — the empty state UI will guide the user
         }
@@ -191,19 +233,29 @@ struct AppointmentFormView: View {
         // Populate form if editing
         if let appointment {
             let df = dateFormatter
-            let tf = timeFormatter
+            let timeF = timeFormatter
             if let d = df.date(from: appointment.date) { date = d }
-            if let t = tf.date(from: appointment.startTime) { startTime = t }
+            if let t = timeF.date(from: appointment.startTime) { startTime = t }
             selectedClientId = appointment.clientId
             if let svcIds = appointment.services?.compactMap(\.id) {
                 selectedServiceIds = Set(svcIds)
             }
             notes = appointment.notes ?? ""
             status = appointment.status ?? .scheduled
+            selectedPromotionId = appointment.promotionId
         } else {
             // Apply preselections for new appointments
             if let preselectedClientId {
                 selectedClientId = preselectedClientId
+                // Auto-select client's promo if they have exactly one
+                if let client = clients.first(where: { $0.id == preselectedClientId }) {
+                    let validPromoIds = client.promotionIds.filter { pid in
+                        promotions.contains(where: { $0.id == pid })
+                    }
+                    if validPromoIds.count == 1 {
+                        selectedPromotionId = validPromoIds.first
+                    }
+                }
             }
             if let preselectedDate {
                 date = preselectedDate
@@ -211,6 +263,25 @@ struct AppointmentFormView: View {
         }
         
         isLoadingData = false
+    }
+    
+    // Watch for client selection change to auto-apply promotion
+    func onClientChange(newClientId: UUID?) {
+        guard appointment == nil else { return } // Only auto-apply for new appointments
+        
+        if let clientId = newClientId,
+           let client = clients.first(where: { $0.id == clientId }) {
+            let validPromoIds = client.promotionIds.filter { pid in
+                promotions.contains(where: { $0.id == pid })
+            }
+            if validPromoIds.count == 1 {
+                selectedPromotionId = validPromoIds.first
+            } else {
+                selectedPromotionId = nil
+            }
+        } else {
+            selectedPromotionId = nil
+        }
     }
     
     private func save() async {
@@ -229,6 +300,7 @@ struct AppointmentFormView: View {
                 clientId: clientId,
                 serviceIds: serviceIdArray,
                 notes: notes.isEmpty ? nil : notes,
+                promotionId: selectedPromotionId,
                 status: status
             )
             success = await viewModel.updateAppointment(id: id, request: request)
@@ -238,7 +310,8 @@ struct AppointmentFormView: View {
                 startTime: timeStr,
                 clientId: clientId,
                 serviceIds: serviceIdArray,
-                notes: notes.isEmpty ? nil : notes
+                notes: notes.isEmpty ? nil : notes,
+                promotionId: selectedPromotionId
             )
             success = await viewModel.createAppointment(request: request)
         }
@@ -246,4 +319,12 @@ struct AppointmentFormView: View {
         isSaving = false
         if success { dismiss() }
     }
+    
+    private func calculateDiscount(total: Int) -> Int {
+        guard let promoId = selectedPromotionId,
+              let promo = promotions.first(where: { $0.id == promoId }) else { return 0 }
+        return Int(Double(total) * promo.discountPercent / 100.0)
+    }
 }
+    
+

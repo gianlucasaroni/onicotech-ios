@@ -40,8 +40,12 @@ struct Appointment: Codable, Identifiable {
     var services: [Service]?
     var serviceIds: [UUID]?
     var totalPrice: Int? // cents
+    var discountAmount: Int? // cents
+    var finalPrice: Int? // cents
     var notes: String?
     var status: AppointmentStatus?
+    var promotionId: UUID?
+    var promotion: Promotion?
     
     var formattedTotalPrice: String {
         let value = Double(totalPrice ?? 0) / 100.0
@@ -62,6 +66,7 @@ struct CreateAppointmentRequest: Codable {
     var clientId: UUID
     var serviceIds: [UUID]
     var notes: String?
+    var promotionId: UUID?
 }
 
 struct UpdateAppointmentRequest: Codable {
@@ -70,5 +75,6 @@ struct UpdateAppointmentRequest: Codable {
     var clientId: UUID
     var serviceIds: [UUID]
     var notes: String?
+    var promotionId: UUID?
     var status: AppointmentStatus
 }

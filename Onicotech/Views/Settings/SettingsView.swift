@@ -2,10 +2,12 @@ import SwiftUI
 internal import EventKit
 
 struct SettingsView: View {
+    @EnvironmentObject var authManager: AuthenticationManager
     @ObservedObject var calendarManager = CalendarManager.shared
     @State private var showingCacheAlert = false
     @State private var cacheAlertMessage = ""
     @State private var isLoading = false
+    @State private var showingLogoutAlert = false
     
     var body: some View {
         Form {
@@ -66,6 +68,19 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            
+            Section {
+                Button(role: .destructive) {
+                    showingLogoutAlert = true
+                } label: {
+                    HStack {
+                        Spacer()
+                        Text("Esci")
+                            .fontWeight(.semibold)
+                        Spacer()
+                    }
+                }
+            }
         }
         .navigationTitle("Impostazioni")
         .inlineNavigationTitle()
@@ -73,6 +88,14 @@ struct SettingsView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text(cacheAlertMessage)
+        }
+        .alert("Conferma Logout", isPresented: $showingLogoutAlert) {
+            Button("Annulla", role: .cancel) { }
+            Button("Esci", role: .destructive) {
+                authManager.logout()
+            }
+        } message: {
+            Text("Vuoi davvero uscire dall'app?")
         }
         .onAppear {
             if calendarManager.isSyncEnabled {

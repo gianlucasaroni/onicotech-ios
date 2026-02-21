@@ -80,9 +80,7 @@ struct AppointmentListView: View {
             
             // Appointments list
             if viewModel.isLoading && viewModel.appointments.isEmpty {
-                Spacer()
-                ProgressView("Caricamento...")
-                Spacer()
+                AppointmentListSkeletonView()
             } else if viewModel.appointments.isEmpty {
                 Spacer()
                 ContentUnavailableView(

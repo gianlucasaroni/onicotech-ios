@@ -1,4 +1,5 @@
 import SwiftUI
+import Foundation
 
 struct ClientFormView: View {
     @Environment(\.dismiss) private var dismiss
@@ -11,6 +12,8 @@ struct ClientFormView: View {
     @State private var phone = ""
     @State private var email = ""
     @State private var notes = ""
+    @State private var selectedPromotionIds: Set<UUID> = []
+    @State private var promotions: [Promotion] = []
     @State private var isSaving = false
     
     private var isEditing: Bool { client != nil }
@@ -40,6 +43,41 @@ struct ClientFormView: View {
                     TextEditor(text: $notes)
                         .frame(minHeight: 80)
                 }
+                
+                Section("Promozioni Default") {
+                    if promotions.isEmpty {
+                        Text("Nessuna promozione disponibile")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(promotions) { promo in
+                            Button {
+                                if selectedPromotionIds.contains(promo.id) {
+                                    selectedPromotionIds.remove(promo.id)
+                                } else {
+                                    selectedPromotionIds.insert(promo.id)
+                                }
+                            } label: {
+                                HStack {
+                                    VStack(alignment: .leading) {
+                                        Text(promo.name)
+                                            .foregroundStyle(.primary)
+                                        Text("-\(Int(promo.discountPercent))%")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    if selectedPromotionIds.contains(promo.id) {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundStyle(.blue)
+                                    } else {
+                                        Image(systemName: "circle")
+                                            .foregroundStyle(.gray)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
             .navigationTitle(isEditing ? "Modifica Cliente" : "Nuovo Cliente")
             .inlineNavigationTitle()
@@ -61,6 +99,16 @@ struct ClientFormView: View {
                     phone = client.phone ?? ""
                     email = client.email ?? ""
                     notes = client.notes ?? ""
+                    selectedPromotionIds = Set(client.promotionIds)
+                }
+                
+                Task {
+                    do {
+                        let allPromos = try await APIClient.shared.getActivePromotions()
+                        promotions = allPromos
+                    } catch {
+                        print("Failed to load promotions: \(error)")
+                    }
                 }
             }
             .interactiveDismissDisabled(isSaving)
@@ -74,7 +122,8 @@ struct ClientFormView: View {
             lastName: lastName.trimmingCharacters(in: .whitespaces),
             phone: phone.isEmpty ? nil : phone,
             email: email.isEmpty ? nil : email,
-            notes: notes.isEmpty ? nil : notes
+            notes: notes.isEmpty ? nil : notes,
+            promotionIds: Array(selectedPromotionIds)
         )
         
         let success: Bool

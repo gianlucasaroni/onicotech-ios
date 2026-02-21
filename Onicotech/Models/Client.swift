@@ -7,6 +7,7 @@ struct Client: Codable, Identifiable, Hashable {
     var phone: String?
     var email: String?
     var notes: String?
+    var promotionIds: [UUID] = []
 
     var fullName: String {
         "\(firstName) \(lastName)"

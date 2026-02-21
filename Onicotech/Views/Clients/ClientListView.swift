@@ -3,6 +3,8 @@ import SwiftUI
 struct ClientListView: View {
     @State private var viewModel = ClientViewModel()
     @State private var showingAddSheet = false
+    @State private var showingAppointmentSheet = false
+    @State private var selectedClientForAppointment: Client?
     @State private var showingDeleteAlert = false
     @State private var clientToDelete: Client?
     @State private var searchText = ""
@@ -22,7 +24,7 @@ struct ClientListView: View {
     var body: some View {
         Group {
             if viewModel.isLoading && viewModel.clients.isEmpty {
-                ProgressView("Caricamento...")
+                ClientListSkeletonView()
             } else if viewModel.clients.isEmpty {
                 ContentUnavailableView(
                     "Nessun cliente",
@@ -34,8 +36,18 @@ struct ClientListView: View {
             } else {
                 List {
                     ForEach(filteredClients) { client in
-                        NavigationLink(value: client) {
+                        NavigationLink {
+                            ClientDetailView(client: client, clientViewModel: viewModel)
+                        } label: {
                             ClientRowView(client: client)
+                                .contextMenu {
+                                    Button {
+                                        selectedClientForAppointment = client
+                                        showingAppointmentSheet = true
+                                    } label: {
+                                        Label("Aggiungi Appuntamento", systemImage: "calendar.badge.plus")
+                                    }
+                                }
                         }
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             Button(role: .destructive) {
@@ -54,9 +66,6 @@ struct ClientListView: View {
         }
         .navigationTitle("Clienti")
         .searchable(text: $searchText, prompt: "Cerca cliente")
-        .navigationDestination(for: Client.self) { client in
-            ClientDetailView(client: client, clientViewModel: viewModel)
-        }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
@@ -68,6 +77,14 @@ struct ClientListView: View {
         }
         .sheet(isPresented: $showingAddSheet) {
             ClientFormView(viewModel: viewModel)
+        }
+        .sheet(isPresented: $showingAppointmentSheet) {
+            if let client = selectedClientForAppointment {
+                AppointmentFormView(
+                    viewModel: AppointmentViewModel(),
+                    preselectedClientId: client.id
+                )
+            }
         }
         .alert("Eliminare il cliente?", isPresented: $showingDeleteAlert) {
             Button("Annulla", role: .cancel) { }

@@ -8,12 +8,11 @@ import AppKit
 
 struct AppointmentDetailView: View {
     let appointmentId: UUID
-    let initialAppointment: Appointment // Fallback if not found in VM list (e.g. filtered out)
+    let initialAppointment: Appointment
     var viewModel: AppointmentViewModel
     
     @Environment(\.dismiss) private var dismiss
     
-    // Dynamic lookup for live updates
     private var appointment: Appointment {
         if let live = viewModel.appointments.first(where: { $0.id == appointmentId }) {
             return live
@@ -31,10 +30,20 @@ struct AppointmentDetailView: View {
     }
     
     @State private var showEditSheet = false
+    @State private var photos: [Photo] = []
+    @State private var selectedPhoto: Photo?
+    @State private var showSourcePicker = false
+    @State private var showGallery = false
+    @State private var showCamera = false
+    #if os(iOS)
+    @State private var inputImage: UIImage?
+    #else
+    @State private var inputImageData: Data?
+    #endif
+    @State private var isUploading = false
 
     var body: some View {
         List {
-            // ... (keep sections) ...
             // Status & Time
             Section {
                 HStack {
@@ -71,7 +80,6 @@ struct AppointmentDetailView: View {
                     
                     if let phone = client.phone, !phone.isEmpty {
                         HStack(spacing: 12) {
-                            // Call Button
                             Link(destination: URL(string: "tel:\(cleanPhoneNumber(phone))")!) {
                                 Label("Chiama", systemImage: "phone.fill")
                                     .font(.headline)
@@ -83,7 +91,6 @@ struct AppointmentDetailView: View {
                             }
                             .buttonStyle(.plain)
 
-                            // WhatsApp Button
                             Link(destination: whatsappURL(phone: phone)) {
                                 Label("WhatsApp", systemImage: "message.fill")
                                     .font(.headline)
@@ -130,51 +137,17 @@ struct AppointmentDetailView: View {
             
             // Photos
             Section("Galleria") {
-                if photos.isEmpty {
-                    Text("Nessuna foto caricata")
-                        .foregroundStyle(.secondary)
-                        .italic()
-                } else {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            if isUploading {
-                                ZStack {
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .fill(Color.gray.opacity(0.1))
-                                        .frame(width: 100, height: 100)
-                                    ProgressView()
-                                }
-                            }
-                            
-                            ForEach(photos) { photo in
-                                // List uses Thumbnail (fallback to original if missing)
-                                KFImage(URL(string: photo.fullThumbnailUrl))
-                                    .placeholder {
-                                        ProgressView()
-                                            .frame(width: 100, height: 100)
-                                    }
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: 100, height: 100)
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                                    .onTapGesture {
-                                        selectedPhoto = photo
-                                    }
-                                    .contextMenu {
-                                        Button(role: .destructive) {
-                                            deletePhoto(photo)
-                                        } label: {
-                                            Label("Elimina", systemImage: "trash")
-                                        }
-                                    }
-                            }
-                        }
-                        .padding(.vertical, 8)
+                PhotoHorizontalList(
+                    photos: photos,
+                    isUploading: isUploading,
+                    size: 100,
+                    onPhotoSelected: { photo in
+                        selectedPhoto = photo
                     }
-                }
+                )
                 
                 Button {
-                    showImagePicker = true
+                    showSourcePicker = true
                 } label: {
                     Label("Aggiungi Foto", systemImage: "camera")
                 }
@@ -197,23 +170,28 @@ struct AppointmentDetailView: View {
         .sheet(isPresented: $showEditSheet) {
             AppointmentFormView(viewModel: viewModel, appointment: appointment)
         }
-        .sheet(isPresented: $showImagePicker) {
-            #if os(iOS)
-            ImagePicker(image: $inputImage)
-            #else
-            ImagePicker(imageData: $inputImageData)
-            #endif
-        }
         #if os(iOS)
+        .photoSourcePicker(
+            showSourcePicker: $showSourcePicker,
+            showGallery: $showGallery,
+            showCamera: $showCamera,
+            selectedImage: $inputImage
+        )
         .fullScreenCover(item: $selectedPhoto) { photo in
-            PhotoGalleryViewer(photos: photos, initialPhoto: photo)
+            FullscreenPhotoViewer(photos: photos, initialPhoto: photo, title: "Galleria")
         }
         .onChange(of: inputImage) {
             uploadSelectedImage()
         }
         #else
+        .photoSourcePicker(
+            showSourcePicker: $showSourcePicker,
+            showGallery: $showGallery,
+            showCamera: $showCamera,
+            selectedImageData: $inputImageData
+        )
         .sheet(item: $selectedPhoto) { photo in
-            PhotoGalleryViewer(photos: photos, initialPhoto: photo)
+            FullscreenPhotoViewer(photos: photos, initialPhoto: photo, title: "Galleria")
         }
         .onChange(of: inputImageData) {
             uploadSelectedImage()
@@ -223,16 +201,6 @@ struct AppointmentDetailView: View {
             await loadPhotos()
         }
     }
-    
-    @State private var photos: [Photo] = []
-    @State private var selectedPhoto: Photo?
-    @State private var showImagePicker = false
-    #if os(iOS)
-    @State private var inputImage: UIImage?
-    #else
-    @State private var inputImageData: Data?
-    #endif
-    @State private var isUploading = false
     
     private func loadPhotos() async {
         do {
@@ -287,14 +255,7 @@ struct AppointmentDetailView: View {
     }
     
     private var formattedDate: String {
-        let months = ["", "Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno",
-                      "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"]
-        let components = appointment.date.split(separator: "-")
-        guard components.count == 3,
-              let day = Int(components[2]),
-              let month = Int(components[1]),
-              month >= 1, month <= 12 else { return appointment.date }
-        return "\(day) \(months[month]) \(components[0])"
+        DateFormatting.italianDate(from: appointment.date)
     }
     
     private func cleanPhoneNumber(_ phone: String) -> String {
@@ -303,7 +264,6 @@ struct AppointmentDetailView: View {
     
     private func whatsappURL(phone: String) -> URL {
         let clean = cleanPhoneNumber(phone)
-        // Assume Italy (+39) if no prefix is present (simple heuristic)
         let finalPhone = clean.count <= 10 ? "39\(clean)" : clean
         
         var msg = "Ciao \(appointment.client?.firstName ?? "Cliente"),\nti ricordo il tuo appuntamento del \(formattedDate) alle \(appointment.startTime)."
@@ -321,99 +281,3 @@ struct AppointmentDetailView: View {
         return URL(string: "https://wa.me/\(finalPhone)?text=\(encoded)") ?? URL(string: "https://wa.me/\(finalPhone)")!
     }
 }
-
-struct PhotoGalleryViewer: View {
-    let photos: [Photo]
-    @State private var selection: Photo
-    @Environment(\.dismiss) private var dismiss
-    
-    init(photos: [Photo], initialPhoto: Photo) {
-        self.photos = photos
-        self._selection = State(initialValue: initialPhoto)
-    }
-    
-    var body: some View {
-        NavigationStack {
-            #if os(iOS)
-            TabView(selection: $selection) {
-                ForEach(photos) { photo in
-                    ZoomableImageView(url: URL(string: photo.fullOriginalUrl))
-                        .tag(photo)
-                }
-            }
-            .tabViewStyle(.page(indexDisplayMode: .always))
-            #else
-            TabView(selection: $selection) {
-                ForEach(photos) { photo in
-                    KFImage(URL(string: photo.fullOriginalUrl))
-                        .resizable()
-                        .scaledToFit()
-                        .tag(photo)
-                }
-            }
-            #endif
-        }
-        .background(Color.black)
-        .navigationTitle("Galleria")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Chiudi") { dismiss() }
-            }
-        }
-        .preferredColorScheme(.dark)
-    }
-}
-
-#if os(iOS)
-struct ZoomableImageView: UIViewRepresentable {
-    let url: URL?
-    
-    func makeUIView(context: Context) -> UIScrollView {
-        let scrollView = UIScrollView()
-        scrollView.delegate = context.coordinator
-        scrollView.maximumZoomScale = 5.0
-        scrollView.minimumZoomScale = 1.0
-        scrollView.showsVerticalScrollIndicator = false
-        scrollView.showsHorizontalScrollIndicator = false
-        scrollView.backgroundColor = .black
-        
-        let imageView = UIImageView()
-        imageView.contentMode = .scaleAspectFit
-        imageView.translatesAutoresizingMaskIntoConstraints = false
-        scrollView.addSubview(imageView)
-        
-        NSLayoutConstraint.activate([
-            imageView.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
-            imageView.heightAnchor.constraint(equalTo: scrollView.heightAnchor),
-            imageView.centerXAnchor.constraint(equalTo: scrollView.centerXAnchor),
-            imageView.centerYAnchor.constraint(equalTo: scrollView.centerYAnchor)
-        ])
-        
-        context.coordinator.imageView = imageView
-        
-        if let url {
-            imageView.kf.indicatorType = .activity
-            imageView.kf.setImage(with: url)
-        }
-        
-        return scrollView
-    }
-    
-    func updateUIView(_ uiView: UIScrollView, context: Context) {}
-    
-    func makeCoordinator() -> Coordinator {
-        Coordinator()
-    }
-    
-    class Coordinator: NSObject, UIScrollViewDelegate {
-        var imageView: UIImageView?
-        
-        func viewForZooming(in scrollView: UIScrollView) -> UIView? {
-            return imageView
-        }
-    }
-}
-#endif

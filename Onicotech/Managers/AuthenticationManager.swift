@@ -4,6 +4,11 @@ import Security
 import SwiftUI
 import Combine
 
+enum StorageKeys {
+    static let authToken = "authToken"
+    static let refreshToken = "refreshToken"
+}
+
 @MainActor
 class AuthenticationManager: ObservableObject {
     @Published var isAuthenticated = false
@@ -11,11 +16,24 @@ class AuthenticationManager: ObservableObject {
     @Published var isBiometricsEnabled = false
     @Published var biometricsType: LABiometryType = .none
     
-    private let tokenKey = "authToken"
+    private var sessionExpiredObserver: Any?
     
     init() {
         checkBiometrics()
-        if let _ = UserDefaults.standard.string(forKey: tokenKey) {
+        
+        // Listen for session expiry from APIClient
+        sessionExpiredObserver = NotificationCenter.default.addObserver(
+            forName: .sessionExpired,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let authManager = self else { return }
+            Task { @MainActor in
+                authManager.logout()
+            }
+        }
+        
+        if let _ = UserDefaults.standard.string(forKey: StorageKeys.authToken) {
             self.isAuthenticated = true
             
             Task {
@@ -30,28 +48,36 @@ class AuthenticationManager: ObservableObject {
         }
     }
     
+    deinit {
+        if let observer = sessionExpiredObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
+    
     func login(email: String, password: String) async throws {
         let response = try await APIClient.shared.login(email: email, password: password)
-        saveToken(response.token)
+        saveTokens(accessToken: response.token, refreshToken: response.refreshToken)
         self.user = response.user
         self.isAuthenticated = true
     }
     
     func register(firstName: String, lastName: String, email: String, password: String) async throws {
         let response = try await APIClient.shared.register(firstName: firstName, lastName: lastName, email: email, password: password)
-        saveToken(response.token)
+        saveTokens(accessToken: response.token, refreshToken: response.refreshToken)
         self.user = response.user
         self.isAuthenticated = true
     }
     
     func logout() {
-        UserDefaults.standard.removeObject(forKey: tokenKey)
+        UserDefaults.standard.removeObject(forKey: StorageKeys.authToken)
+        UserDefaults.standard.removeObject(forKey: StorageKeys.refreshToken)
         self.isAuthenticated = false
         self.user = nil
     }
     
-    private func saveToken(_ token: String) {
-        UserDefaults.standard.set(token, forKey: tokenKey)
+    private func saveTokens(accessToken: String, refreshToken: String) {
+        UserDefaults.standard.set(accessToken, forKey: StorageKeys.authToken)
+        UserDefaults.standard.set(refreshToken, forKey: StorageKeys.refreshToken)
     }
     
     // MARK: - Biometrics
@@ -70,31 +96,16 @@ class AuthenticationManager: ObservableObject {
         let context = LAContext()
         var error: NSError?
         
-        // Check if biometrics are available
         guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) else {
             throw AuthError.biometricsNotAvailable
         }
         
-        // Reason string for FaceID (TouchID uses localizedReason in evaluatePolicy)
         let reason = "Accedi con FaceID"
         
         do {
             let success = try await context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason)
             
             if success {
-                // In a real app, we would retrieve credentials from Keychain here.
-                // Since we don't have user credentials stored yet, we can't really "login" to the backend
-                // UNLESS the token is stored in Keychain and we retrieve it.
-                // For now, if the token is valid in UserDefaults, we just proceed.
-                // If token is expired, we need credentials to get a new one.
-                // Simpler approach for this iteration:
-                // If token exists -> Auto-login on app launch.
-                // Biometrics is used to protecting the key if we stored email/pass.
-                // Let's assume for this MVP: Biometrics unlocks the stored Token if present?
-                // Or: We store Email/Password in Keychain, and Biometrics retrieves it to call login().
-                
-                // Let's defer full Keychain implementation for brevity unless requested.
-                // Proceed as success if authenticated.
                  self.isAuthenticated = true
             }
         } catch {

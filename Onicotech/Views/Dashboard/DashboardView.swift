@@ -8,6 +8,9 @@ struct DashboardView: View {
     var body: some View {
 // ... (keep body content same until headerView) ...
         ScrollView {
+            if viewModel.isLoading && viewModel.totalClients == 0 && viewModel.nextAppointments.isEmpty {
+                DashboardSkeletonView()
+            } else {
             VStack(spacing: 20) {
                 // Header
                 headerView
@@ -87,7 +90,8 @@ struct DashboardView: View {
                 }
             }
             .padding(.vertical)
-        }
+            } // else
+        } // ScrollView
         .navigationTitle("Dashboard")
         .inlineNavigationTitle()
         .background(Color.groupedBackgroundCompat)
