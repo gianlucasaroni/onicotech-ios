@@ -57,7 +57,8 @@ final class APIClient {
     
     // MARK: - Change this to your backend URL
     //static let baseServerURL = "http://192.168.1.166:8282/api/v1"
-    static let baseServerURL = "http://192.168.1.14:8282/api/v1"
+    //static let baseServerURL = "http://192.168.1.14:8282/api/v1"
+    static let baseServerURL = "http://be-onicotech.casaperoni/api/v1"
     
     private var isRefreshing = false
     

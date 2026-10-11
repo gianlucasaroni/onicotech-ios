@@ -249,7 +249,7 @@ struct ClientRecallRowView: View {
     
     private var whatsappURL: URL {
         guard let phone = item.client.phone, !phone.isEmpty else {
-            return URL(string: "https://wa.me")!
+            return URL(string: "https://api.whatsapp.com/send")!
         }
         let clean = cleanPhoneNumber(phone)
         let finalPhone = clean.count <= 10 ? "39\(clean)" : clean
@@ -260,7 +260,7 @@ struct ClientRecallRowView: View {
         let msg = "Ciao \(item.client.firstName)! ✨ Sono passate circa \(weeksStr) dal tuo ultimo trattamento unghie\(servicesStr).\nLe tue unghie sono pronte per il refill? Se vuoi fissare il tuo prossimo appuntamento prima che l'agenda si riempia, scrivimi pure qui quando ti farebbe comodo! 💅"
         
         let encoded = msg.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        return URL(string: "https://wa.me/\(finalPhone)?text=\(encoded)") ?? URL(string: "https://wa.me/\(finalPhone)")!
+        return URL(string: "https://api.whatsapp.com/send?phone=\(finalPhone)&text=\(encoded)") ?? URL(string: "https://api.whatsapp.com/send?phone=\(finalPhone)")!
     }
     
     var body: some View {

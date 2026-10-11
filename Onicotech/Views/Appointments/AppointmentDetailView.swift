@@ -402,6 +402,6 @@ struct AppointmentDetailView: View {
         msg += "\n\nA presto!"
         
         let encoded = msg.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        return URL(string: "https://wa.me/\(finalPhone)?text=\(encoded)") ?? URL(string: "https://wa.me/\(finalPhone)")!
+        return URL(string: "https://api.whatsapp.com/send?phone=\(finalPhone)&text=\(encoded)") ?? URL(string: "https://api.whatsapp.com/send?phone=\(finalPhone)")!
     }
 }
