@@ -8,11 +8,11 @@ class PromotionViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var showError = false
     
-    func loadPromotions() async {
+    func loadPromotions(salonId: UUID? = nil) async {
         isLoading = true
         errorMessage = nil
         do {
-            promotions = try await APIClient.shared.getPromotions()
+            promotions = try await APIClient.shared.getPromotions(salonId: salonId)
         } catch {
             errorMessage = error.localizedDescription
             showError = true

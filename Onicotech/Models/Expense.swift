@@ -73,6 +73,8 @@ struct ExpensePhoto: Codable, Identifiable, Hashable {
 
 struct Expense: Codable, Identifiable {
     var id: UUID?
+    var salonId: UUID?
+    var salon: Salon?
     var description: String
     var amount: Int // cents
     var category: ExpenseCategory

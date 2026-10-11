@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct AppointmentListView: View {
+    @EnvironmentObject var salonManager: SalonManager
     @State private var viewModel = AppointmentViewModel()
     @State private var showingAddSheet = false
     @State private var selectedAppointment: Appointment?
@@ -73,7 +74,10 @@ struct AppointmentListView: View {
             .padding(.horizontal)
             .padding(.top, 8)
             .onChange(of: viewModel.selectedDate) {
-                Task { await viewModel.loadAppointments() }
+                Task { await viewModel.loadAppointments(salonId: salonManager.selectedSalonId) }
+            }
+            .onChange(of: salonManager.selectedSalon) {
+                Task { await viewModel.loadAppointments(salonId: salonManager.selectedSalonId) }
             }
             
             Divider()
@@ -86,7 +90,7 @@ struct AppointmentListView: View {
                 ContentUnavailableView(
                     "Nessun appuntamento",
                     systemImage: "calendar.badge.exclamationmark",
-                    description: Text("Non ci sono appuntamenti per questa data")
+                    description: Text("Non ci sono appuntamenti per questa data e sede selezionata")
                 )
                 Spacer()
             } else {
@@ -94,6 +98,31 @@ struct AppointmentListView: View {
                     ForEach(viewModel.appointments) { appointment in
                         NavigationLink(destination: AppointmentDetailView(appointmentId: appointment.id!, initialAppointment: appointment, viewModel: viewModel)) {
                             AppointmentRowView(appointment: appointment)
+                        }
+                        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                            if appointment.status == .pending {
+                                Button {
+                                    Task {
+                                        if let id = appointment.id {
+                                            _ = await viewModel.confirmAppointment(id: id)
+                                        }
+                                    }
+                                } label: {
+                                    Label("Approva", systemImage: "checkmark.circle")
+                                }
+                                .tint(.green)
+                            } else if appointment.status == .scheduled {
+                                Button {
+                                    Task {
+                                        if let id = appointment.id {
+                                            _ = await viewModel.completeAppointment(id: id)
+                                        }
+                                    }
+                                } label: {
+                                    Label("Completa", systemImage: "checkmark.seal")
+                                }
+                                .tint(.blue)
+                            }
                         }
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             Button(role: .destructive) {
@@ -123,6 +152,13 @@ struct AppointmentListView: View {
         }
         .navigationTitle("Appuntamenti")
         .toolbar {
+            ToolbarItem(placement: .automatic) {
+                SalonPickerMenu {
+                    Task {
+                        await viewModel.loadAppointments(salonId: salonManager.selectedSalonId)
+                    }
+                }
+            }
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     showingAddSheet = true
@@ -148,7 +184,10 @@ struct AppointmentListView: View {
             Text(viewModel.errorMessage ?? "Errore sconosciuto")
         }
         .task {
-            await viewModel.loadAppointments()
+            await viewModel.loadAppointments(salonId: salonManager.selectedSalonId)
+        }
+        .refreshable {
+            await viewModel.loadAppointments(salonId: salonManager.selectedSalonId)
         }
     }
     
@@ -167,7 +206,9 @@ struct AppointmentRowView: View {
     var statusColor: Color {
         switch appointment.status {
         case .scheduled: return .blue
-        case .rescheduled: return .orange
+        case .pending: return .orange
+        case .completed: return .green
+        case .rescheduled: return .purple
         case .cancelled: return .red
         case .none: return .gray
         }
@@ -180,14 +221,19 @@ struct AppointmentRowView: View {
                     .font(.headline)
                     .monospacedDigit()
                 
+                if let salon = appointment.salon {
+                    SalonBadge(name: salon.name, isDefault: salon.isDefault)
+                }
+                
                 Spacer()
                 
                 if let status = appointment.status {
                     Label(status.displayName, systemImage: status.iconName)
                         .font(.caption)
+                        .fontWeight(.medium)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
-                        .background(statusColor.opacity(0.1))
+                        .background(statusColor.opacity(0.12))
                         .foregroundStyle(statusColor)
                         .clipShape(Capsule())
                 }
@@ -212,6 +258,12 @@ struct AppointmentRowView: View {
                         .lineLimit(1)
                 }
                 Spacer()
+                if let _ = appointment.totalPrice {
+                    Text(appointment.formattedTotalPrice)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.primary)
+                }
             }
         }
         .padding(.vertical, 4)

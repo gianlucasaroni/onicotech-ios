@@ -2,12 +2,16 @@ import Foundation
 
 enum AppointmentStatus: String, Codable, CaseIterable {
     case scheduled
+    case pending
+    case completed
     case cancelled
     case rescheduled
     
     var displayName: String {
         switch self {
         case .scheduled: return "Programmato"
+        case .pending: return "In Attesa"
+        case .completed: return "Completato"
         case .cancelled: return "Cancellato"
         case .rescheduled: return "Riprogrammato"
         }
@@ -16,6 +20,8 @@ enum AppointmentStatus: String, Codable, CaseIterable {
     var iconName: String {
         switch self {
         case .scheduled: return "calendar.badge.clock"
+        case .pending: return "hourglass"
+        case .completed: return "checkmark.seal.fill"
         case .cancelled: return "xmark.circle.fill"
         case .rescheduled: return "arrow.triangle.2.circlepath.circle.fill"
         }
@@ -24,8 +30,10 @@ enum AppointmentStatus: String, Codable, CaseIterable {
     var color: String {
         switch self {
         case .scheduled: return "blue"
+        case .pending: return "orange"
+        case .completed: return "green"
         case .cancelled: return "red"
-        case .rescheduled: return "orange"
+        case .rescheduled: return "yellow"
         }
     }
 }
@@ -37,6 +45,8 @@ struct Appointment: Codable, Identifiable {
     var endTime: String?       // "HH:MM"
     var clientId: UUID
     var client: Client?
+    var salonId: UUID?
+    var salon: Salon?
     var services: [Service]?
     var serviceIds: [UUID]?
     var totalPrice: Int? // cents
@@ -64,6 +74,7 @@ struct CreateAppointmentRequest: Codable {
     var date: String
     var startTime: String
     var clientId: UUID
+    var salonId: UUID?
     var serviceIds: [UUID]
     var notes: String?
     var promotionId: UUID?
@@ -73,6 +84,7 @@ struct UpdateAppointmentRequest: Codable {
     var date: String
     var startTime: String
     var clientId: UUID
+    var salonId: UUID?
     var serviceIds: [UUID]
     var notes: String?
     var promotionId: UUID?

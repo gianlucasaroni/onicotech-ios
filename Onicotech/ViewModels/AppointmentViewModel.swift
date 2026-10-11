@@ -21,11 +21,11 @@ class AppointmentViewModel {
         return formatter.string(from: selectedDate)
     }
     
-    func loadAppointments() async {
+    func loadAppointments(salonId: UUID? = nil) async {
         isLoading = true
         errorMessage = nil
         do {
-            appointments = try await api.getAppointments(date: selectedDateString)
+            appointments = try await api.getAppointments(date: selectedDateString, salonId: salonId)
         } catch {
             errorMessage = error.localizedDescription
             showError = true
@@ -60,6 +60,9 @@ class AppointmentViewModel {
             if let index = appointments.firstIndex(where: { $0.id == id }) {
                 var updatedWithClient = updated
                 updatedWithClient.client = appointments[index].client // Preserve client info
+                if updatedWithClient.salon == nil {
+                    updatedWithClient.salon = appointments[index].salon
+                }
                 appointments[index] = updatedWithClient
                 
                 // Sync
@@ -92,22 +95,57 @@ class AppointmentViewModel {
     func cancelAppointment(id: UUID) async -> Bool {
         guard let index = appointments.firstIndex(where: { $0.id == id }) else { return false }
         let current = appointments[index]
-        
-        // Ensure we have service IDs
-        // Services are populated. If not, we might fail validation.
-        // Assuming services are loaded.
-        let serviceIds = current.services?.compactMap { $0.id } ?? []
+        let serviceIds = current.services?.compactMap { $0.id } ?? current.serviceIds ?? []
         
         let request = UpdateAppointmentRequest(
             date: current.date,
             startTime: current.startTime,
             clientId: current.clientId,
+            salonId: current.salonId,
             serviceIds: serviceIds,
             notes: current.notes,
+            promotionId: current.promotionId,
             status: .cancelled
         )
         
-        // Reuse updateAppointment which handles API and Sync
+        return await updateAppointment(id: id, request: request)
+    }
+    
+    func confirmAppointment(id: UUID) async -> Bool {
+        guard let index = appointments.firstIndex(where: { $0.id == id }) else { return false }
+        let current = appointments[index]
+        let serviceIds = current.services?.compactMap { $0.id } ?? current.serviceIds ?? []
+        
+        let request = UpdateAppointmentRequest(
+            date: current.date,
+            startTime: current.startTime,
+            clientId: current.clientId,
+            salonId: current.salonId,
+            serviceIds: serviceIds,
+            notes: current.notes,
+            promotionId: current.promotionId,
+            status: .scheduled
+        )
+        
+        return await updateAppointment(id: id, request: request)
+    }
+    
+    func completeAppointment(id: UUID) async -> Bool {
+        guard let index = appointments.firstIndex(where: { $0.id == id }) else { return false }
+        let current = appointments[index]
+        let serviceIds = current.services?.compactMap { $0.id } ?? current.serviceIds ?? []
+        
+        let request = UpdateAppointmentRequest(
+            date: current.date,
+            startTime: current.startTime,
+            clientId: current.clientId,
+            salonId: current.salonId,
+            serviceIds: serviceIds,
+            notes: current.notes,
+            promotionId: current.promotionId,
+            status: .completed
+        )
+        
         return await updateAppointment(id: id, request: request)
     }
 }

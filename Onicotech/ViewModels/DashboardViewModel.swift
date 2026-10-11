@@ -27,13 +27,17 @@ class DashboardViewModel {
         return String(format: "€%.2f", value)
     }
     
+    var pendingBookingsCount: Int {
+        nextAppointments.filter { $0.status == .pending }.count
+    }
+    
     private let api = APIClient.shared
     
-    func loadData() async {
+    func loadData(salonId: UUID? = nil) async {
         isLoading = true
         errorMessage = nil
         do {
-            data = try await api.getDashboard()
+            data = try await api.getDashboard(salonId: salonId)
         } catch {
             errorMessage = error.localizedDescription
             showError = true

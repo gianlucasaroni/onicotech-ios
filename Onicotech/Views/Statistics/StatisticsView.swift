@@ -2,6 +2,7 @@ import SwiftUI
 import Charts
 
 struct StatisticsView: View {
+    @EnvironmentObject var salonManager: SalonManager
     @State private var viewModel = StatisticsViewModel()
     
     var body: some View {
@@ -146,12 +147,27 @@ struct StatisticsView: View {
             .padding(.vertical)
         }
         .navigationTitle("Statistiche Avanzate")
+        .inlineNavigationTitle()
+        .toolbar {
+            ToolbarItem(placement: .automatic) {
+                SalonPickerMenu {
+                    Task {
+                        await viewModel.loadStats(salonId: salonManager.selectedSalonId)
+                    }
+                }
+            }
+        }
         .background(Color.groupedBackgroundCompat)
+        .onChange(of: salonManager.selectedSalon) {
+            Task {
+                await viewModel.loadStats(salonId: salonManager.selectedSalonId)
+            }
+        }
         .task {
-            await viewModel.loadStats()
+            await viewModel.loadStats(salonId: salonManager.selectedSalonId)
         }
         .refreshable {
-            await viewModel.loadStats()
+            await viewModel.loadStats(salonId: salonManager.selectedSalonId)
         }
         .alert("Errore", isPresented: $viewModel.showError) {
             Button("OK") { }

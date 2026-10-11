@@ -2,11 +2,11 @@ import SwiftUI
 
 struct DashboardView: View {
     @EnvironmentObject var authManager: AuthenticationManager
+    @EnvironmentObject var salonManager: SalonManager
     @State private var viewModel = DashboardViewModel()
     @State private var appointmentViewModel = AppointmentViewModel()
     
     var body: some View {
-// ... (keep body content same until headerView) ...
         ScrollView {
             if viewModel.isLoading && viewModel.totalClients == 0 && viewModel.nextAppointments.isEmpty {
                 DashboardSkeletonView()
@@ -14,6 +14,38 @@ struct DashboardView: View {
             VStack(spacing: 20) {
                 // Header
                 headerView
+                
+                // Pending Online Bookings Banner
+                if viewModel.pendingBookingsCount > 0 {
+                    NavigationLink(destination: AppointmentListView()) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "hourglass.badge.plus")
+                                .font(.title2)
+                                .foregroundStyle(.orange)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Prenotazioni Online in Attesa")
+                                    .font(.headline)
+                                    .foregroundStyle(.primary)
+                                Text("Hai \(viewModel.pendingBookingsCount) richiesta/e da approvare")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding()
+                        .background(Color.orange.opacity(0.12))
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+                        )
+                        .padding(.horizontal)
+                    }
+                    .buttonStyle(.plain)
+                }
                 
                 // Stats Cards
                 HStack(spacing: 16) {
@@ -94,12 +126,26 @@ struct DashboardView: View {
         } // ScrollView
         .navigationTitle("Dashboard")
         .inlineNavigationTitle()
+        .toolbar {
+            ToolbarItem(placement: .automatic) {
+                SalonPickerMenu {
+                    Task {
+                        await viewModel.loadData(salonId: salonManager.selectedSalonId)
+                    }
+                }
+            }
+        }
         .background(Color.groupedBackgroundCompat)
+        .onChange(of: salonManager.selectedSalon) {
+            Task {
+                await viewModel.loadData(salonId: salonManager.selectedSalonId)
+            }
+        }
         .task {
-            await viewModel.loadData()
+            await viewModel.loadData(salonId: salonManager.selectedSalonId)
         }
         .refreshable {
-            await viewModel.loadData()
+            await viewModel.loadData(salonId: salonManager.selectedSalonId)
         }
         .alert("Errore", isPresented: $viewModel.showError) {
             Button("OK", role: .cancel) { }

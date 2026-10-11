@@ -3,6 +3,7 @@ import Foundation
 
 struct AppointmentFormView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var salonManager: SalonManager
     var viewModel: AppointmentViewModel
     
     var appointment: Appointment?
@@ -12,6 +13,7 @@ struct AppointmentFormView: View {
     @State private var date = Date()
     @State private var startTime = Date()
     @State private var selectedClientId: UUID?
+    @State private var selectedSalonId: UUID?
     @State private var selectedServiceIds: Set<UUID> = []
     @State private var notes = ""
     @State private var status: AppointmentStatus = .scheduled
@@ -53,6 +55,17 @@ struct AppointmentFormView: View {
                         Section("Data e Ora") {
                             DatePicker("Data", selection: $date, displayedComponents: .date)
                             DatePicker("Ora inizio", selection: $startTime, displayedComponents: .hourAndMinute)
+                        }
+                        
+                        if !salonManager.salons.isEmpty {
+                            Section("Sede") {
+                                Picker("Sede", selection: $selectedSalonId) {
+                                    Text("Predefinita / Non specificata").tag(nil as UUID?)
+                                    ForEach(salonManager.salons) { salon in
+                                        Text(salon.name + (salon.isDefault ? " (Predefinita)" : "")).tag(salon.id as UUID?)
+                                    }
+                                }
+                            }
                         }
                         
                         Section("Cliente") {
@@ -237,6 +250,7 @@ struct AppointmentFormView: View {
             if let d = df.date(from: appointment.date) { date = d }
             if let t = timeF.date(from: appointment.startTime) { startTime = t }
             selectedClientId = appointment.clientId
+            selectedSalonId = appointment.salonId
             if let svcIds = appointment.services?.compactMap(\.id) {
                 selectedServiceIds = Set(svcIds)
             }
@@ -244,6 +258,7 @@ struct AppointmentFormView: View {
             status = appointment.status ?? .scheduled
             selectedPromotionId = appointment.promotionId
         } else {
+            selectedSalonId = salonManager.selectedSalonId ?? salonManager.defaultSalon?.id
             // Apply preselections for new appointments
             if let preselectedClientId {
                 selectedClientId = preselectedClientId
@@ -298,6 +313,7 @@ struct AppointmentFormView: View {
                 date: dateStr,
                 startTime: timeStr,
                 clientId: clientId,
+                salonId: selectedSalonId,
                 serviceIds: serviceIdArray,
                 notes: notes.isEmpty ? nil : notes,
                 promotionId: selectedPromotionId,
@@ -309,6 +325,7 @@ struct AppointmentFormView: View {
                 date: dateStr,
                 startTime: timeStr,
                 clientId: clientId,
+                salonId: selectedSalonId,
                 serviceIds: serviceIdArray,
                 notes: notes.isEmpty ? nil : notes,
                 promotionId: selectedPromotionId

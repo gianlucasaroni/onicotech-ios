@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct PromotionListView: View {
+    @EnvironmentObject var salonManager: SalonManager
     @StateObject private var viewModel = PromotionViewModel()
     @State private var showingAddSheet = false
     @State private var showingDeleteAlert = false
@@ -35,16 +36,24 @@ struct PromotionListView: View {
                     }
                 }
                 .refreshable {
-                    await viewModel.loadPromotions()
+                    await viewModel.loadPromotions(salonId: salonManager.selectedSalonId)
                 }
             }
         }
         .navigationTitle("Promozioni")
+        .inlineNavigationTitle()
         .toolbar {
-            Button {
-                showingAddSheet = true
-            } label: {
-                Image(systemName: "plus")
+            ToolbarItem(placement: .automatic) {
+                SalonPickerMenu {
+                    Task { await viewModel.loadPromotions(salonId: salonManager.selectedSalonId) }
+                }
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showingAddSheet = true
+                } label: {
+                    Image(systemName: "plus")
+                }
             }
         }
         .sheet(isPresented: $showingAddSheet) {
@@ -64,8 +73,11 @@ struct PromotionListView: View {
                 Text("Sei sicuro di voler eliminare '\(promo.name)'? Questa azione non può essere annullata.")
             }
         }
+        .onChange(of: salonManager.selectedSalon) { _, _ in
+            Task { await viewModel.loadPromotions(salonId: salonManager.selectedSalonId) }
+        }
         .task {
-            await viewModel.loadPromotions()
+            await viewModel.loadPromotions(salonId: salonManager.selectedSalonId)
         }
     }
 }
@@ -78,6 +90,9 @@ struct PromotionRowView: View {
             HStack {
                 Text(promotion.name)
                     .font(.headline)
+                if let salon = promotion.salon {
+                    SalonBadge(name: salon.name, isDefault: salon.isDefault)
+                }
                 Spacer()
                 if !promotion.active {
                     Text("INATTIVA")

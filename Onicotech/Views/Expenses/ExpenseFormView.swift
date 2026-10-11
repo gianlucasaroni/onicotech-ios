@@ -6,6 +6,7 @@ import UIKit
 
 struct ExpenseFormView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var salonManager: SalonManager
     
     var expense: Expense?
     var onSave: () -> Void
@@ -14,6 +15,7 @@ struct ExpenseFormView: View {
     @State private var amountText = ""
     @State private var category: ExpenseCategory = .other
     @State private var paymentMethod: PaymentMethod = .cash
+    @State private var selectedSalonId: UUID?
     @State private var date = Date()
     @State private var isRecurring = false
     @State private var notes = ""
@@ -50,10 +52,21 @@ struct ExpenseFormView: View {
                         Text("€")
                             .foregroundStyle(.secondary)
                         TextField("Importo *", text: $amountText)
-                            .keyboardType(.decimalPad)
+                            .decimalKeyboard()
                     }
                     
                     DatePicker("Data", selection: $date, displayedComponents: .date)
+                }
+                
+                if !salonManager.salons.isEmpty {
+                    Section("Sede") {
+                        Picker("Sede", selection: $selectedSalonId) {
+                            Text("Generale / Nessuna").tag(nil as UUID?)
+                            ForEach(salonManager.salons) { salon in
+                                Text(salon.name + (salon.isDefault ? " (Predefinita)" : "")).tag(salon.id as UUID?)
+                            }
+                        }
+                    }
                 }
                 
                 Section("Categoria") {
@@ -184,12 +197,15 @@ struct ExpenseFormView: View {
                     isRecurring = expense.isRecurring
                     notes = expense.notes ?? ""
                     existingPhotos = expense.photos ?? []
+                    selectedSalonId = expense.salonId
                     
                     let f = DateFormatter()
                     f.dateFormat = "yyyy-MM-dd"
                     if let d = f.date(from: expense.date) {
                         date = d
                     }
+                } else {
+                    selectedSalonId = salonManager.selectedSalonId ?? salonManager.defaultSalon?.id
                 }
             }
             .interactiveDismissDisabled(isSaving)
@@ -203,6 +219,8 @@ struct ExpenseFormView: View {
         f.dateFormat = "yyyy-MM-dd"
         
         let newExpense = Expense(
+            id: expense?.id,
+            salonId: selectedSalonId,
             description: description.trimmingCharacters(in: .whitespaces),
             amount: amountInCents,
             category: category,

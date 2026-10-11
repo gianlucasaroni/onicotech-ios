@@ -3,6 +3,7 @@ internal import EventKit
 
 struct ContentView: View {
     @EnvironmentObject var authManager: AuthenticationManager
+    @EnvironmentObject var salonManager: SalonManager
     
     var body: some View {
         if authManager.isAuthenticated {
@@ -30,6 +31,9 @@ struct ContentView: View {
                 }
             }
             .tabViewStyle(.sidebarAdaptable)
+            .task {
+                await salonManager.loadSalons()
+            }
         } else {
             LoginView()
         }

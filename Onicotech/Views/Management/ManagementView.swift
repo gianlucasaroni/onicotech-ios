@@ -5,6 +5,10 @@ struct ManagementView: View {
         NavigationStack {
             List {
                 Section("Attività") {
+                    NavigationLink(destination: SalonListView()) {
+                        Label("Sedi e Saloni", systemImage: "building.2.fill")
+                    }
+                    
                     NavigationLink(destination: ServiceListView()) {
                         Label("Servizi", systemImage: "scissors")
                     }

@@ -11,11 +11,11 @@ class StatisticsViewModel {
     
     private let api = APIClient.shared
     
-    func loadStats() async {
+    func loadStats(salonId: UUID? = nil) async {
         isLoading = true
         errorMessage = nil
         do {
-            stats = try await api.getAdvancedStats()
+            stats = try await api.getAdvancedStats(salonId: salonId)
         } catch {
             errorMessage = error.localizedDescription
             showError = true

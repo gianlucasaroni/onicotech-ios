@@ -268,7 +268,9 @@ struct AppointmentRowCompact: View {
     var statusColor: Color {
         switch appointment.status {
         case .scheduled: return .blue
-        case .rescheduled: return .orange
+        case .pending: return .orange
+        case .completed: return .green
+        case .rescheduled: return .purple
         case .cancelled: return .red
         case .none: return .gray
         }
@@ -289,7 +291,7 @@ struct AppointmentRowCompact: View {
             .frame(width: 44)
             
             VStack(alignment: .leading, spacing: 4) {
-                HStack {
+                HStack(spacing: 6) {
                     Text(appointment.timeRange)
                         .font(.subheadline)
                         .fontWeight(.medium)
@@ -299,7 +301,9 @@ struct AppointmentRowCompact: View {
                             .font(.caption)
                             .foregroundStyle(statusColor)
                     }
-                    
+                    if let salon = appointment.salon {
+                        SalonBadge(name: salon.name, isDefault: salon.isDefault)
+                    }
                 }
                 if let services = appointment.services, !services.isEmpty {
                     Text(services.map(\.name).joined(separator: ", "))

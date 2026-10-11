@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ExpenseListView: View {
+    @EnvironmentObject var salonManager: SalonManager
     @State private var expenses: [Expense] = []
     @State private var isLoading = true
     @State private var showingForm = false
@@ -71,7 +72,13 @@ struct ExpenseListView: View {
             }
         }
         .navigationTitle("Spese")
+        .inlineNavigationTitle()
         .toolbar {
+            ToolbarItem(placement: .automatic) {
+                SalonPickerMenu {
+                    Task { await loadExpenses() }
+                }
+            }
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     showingForm = true
@@ -92,6 +99,9 @@ struct ExpenseListView: View {
         .onChange(of: selectedCategory) { _, _ in
             Task { await loadExpenses() }
         }
+        .onChange(of: salonManager.selectedSalon) { _, _ in
+            Task { await loadExpenses() }
+        }
     }
     
     private func loadExpenses() async {
@@ -99,7 +109,8 @@ struct ExpenseListView: View {
         do {
             expenses = try await APIClient.shared.getExpenses(
                 month: selectedMonth,
-                category: selectedCategory?.rawValue
+                category: selectedCategory?.rawValue,
+                salonId: salonManager.selectedSalonId
             )
         } catch {
             print("Error loading expenses: \(error)")
@@ -136,9 +147,14 @@ struct ExpenseRowView: View {
                 .frame(width: 32)
             
             VStack(alignment: .leading, spacing: 2) {
-                Text(expense.description)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
+                HStack(spacing: 6) {
+                    Text(expense.description)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                    if let salon = expense.salon {
+                        SalonBadge(name: salon.name, isDefault: salon.isDefault)
+                    }
+                }
                 HStack(spacing: 4) {
                     Text(expense.category.displayName)
                     if expense.isRecurring {

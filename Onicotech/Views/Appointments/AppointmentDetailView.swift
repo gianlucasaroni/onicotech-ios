@@ -23,7 +23,9 @@ struct AppointmentDetailView: View {
     var statusColor: Color {
         switch appointment.status {
         case .scheduled: return .blue
-        case .rescheduled: return .orange
+        case .pending: return .orange
+        case .completed: return .green
+        case .rescheduled: return .purple
         case .cancelled: return .red
         case .none: return .gray
         }
@@ -46,6 +48,19 @@ struct AppointmentDetailView: View {
         List {
             // Status & Time
             Section {
+                if let salon = appointment.salon {
+                    HStack {
+                        Label("Sede", systemImage: "building.2")
+                        Spacer()
+                        Text(salon.name)
+                            .fontWeight(.medium)
+                        if let city = salon.city, !city.isEmpty {
+                            Text("(\(city))")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                
                 HStack {
                     Label("Data", systemImage: "calendar")
                     Spacer()
@@ -66,10 +81,70 @@ struct AppointmentDetailView: View {
                         Text(status.displayName)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 4)
-                            .background(statusColor.opacity(0.1))
+                            .background(statusColor.opacity(0.12))
                             .foregroundStyle(statusColor)
                             .clipShape(Capsule())
                     }
+                }
+            }
+            
+            // Quick Status Actions
+            if appointment.status == .pending {
+                Section("Gestione Richiesta Online") {
+                    Button {
+                        Task {
+                            _ = await viewModel.confirmAppointment(id: appointmentId)
+                        }
+                    } label: {
+                        HStack {
+                            Spacer()
+                            Label("Approva Prenotazione Online", systemImage: "checkmark.circle.fill")
+                                .fontWeight(.semibold)
+                            Spacer()
+                        }
+                    }
+                    .tint(.green)
+                    
+                    Button(role: .destructive) {
+                        Task {
+                            _ = await viewModel.cancelAppointment(id: appointmentId)
+                        }
+                    } label: {
+                        HStack {
+                            Spacer()
+                            Label("Rifiuta Prenotazione", systemImage: "xmark.circle")
+                            Spacer()
+                        }
+                    }
+                }
+            } else if appointment.status == .scheduled {
+                Section {
+                    Button {
+                        Task {
+                            _ = await viewModel.completeAppointment(id: appointmentId)
+                        }
+                    } label: {
+                        HStack {
+                            Spacer()
+                            Label("Segna come Completato", systemImage: "checkmark.seal.fill")
+                                .fontWeight(.semibold)
+                            Spacer()
+                        }
+                    }
+                    .tint(.blue)
+                    
+                    Button {
+                        Task {
+                            _ = await viewModel.cancelAppointment(id: appointmentId)
+                        }
+                    } label: {
+                        HStack {
+                            Spacer()
+                            Label("Annulla Appuntamento", systemImage: "xmark.circle")
+                            Spacer()
+                        }
+                    }
+                    .tint(.orange)
                 }
             }
             

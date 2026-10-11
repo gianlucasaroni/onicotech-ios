@@ -309,15 +309,75 @@ final class APIClient {
         try await requestNoContent(path: "/services/\(id)", method: "DELETE")
     }
 
-    // MARK: - Promotions
+    // MARK: - Salons / Sedi
     
-    func getPromotions() async throws -> [Promotion] {
-        let response: APIResponse<[Promotion]> = try await request(path: "/promotions")
+    func getSalons() async throws -> [Salon] {
+        let response: APIResponse<[Salon]> = try await request(path: "/salons")
         return response.data ?? []
     }
     
-    func getActivePromotions() async throws -> [Promotion] {
-        let response: APIResponse<[Promotion]> = try await request(path: "/promotions/active")
+    func getSalon(id: UUID) async throws -> Salon {
+        let response: APIResponse<Salon> = try await request(path: "/salons/\(id)")
+        guard let salon = response.data else { throw APIError.invalidResponse }
+        return salon
+    }
+    
+    func createSalon(_ request: CreateSalonRequest) async throws -> Salon {
+        let response: APIResponse<Salon> = try await self.request(path: "/salons", method: "POST", body: request)
+        guard let created = response.data else { throw APIError.invalidResponse }
+        return created
+    }
+    
+    func updateSalon(id: UUID, _ request: UpdateSalonRequest) async throws -> Salon {
+        let response: APIResponse<Salon> = try await self.request(path: "/salons/\(id)", method: "PUT", body: request)
+        guard let updated = response.data else { throw APIError.invalidResponse }
+        return updated
+    }
+    
+    func deleteSalon(id: UUID) async throws {
+        try await requestNoContent(path: "/salons/\(id)", method: "DELETE")
+    }
+    
+    func setDefaultSalon(id: UUID) async throws {
+        let _: APIResponse<[String: String]> = try await request(path: "/salons/\(id)/default", method: "POST")
+    }
+    
+    func getSalonServices(salonId: UUID) async throws -> [SalonServiceItem] {
+        let response: APIResponse<[SalonServiceItem]> = try await request(path: "/salons/\(salonId)/services")
+        return response.data ?? []
+    }
+    
+    func updateSalonServices(salonId: UUID, _ request: UpdateSalonServicesRequest) async throws {
+        let _: APIResponse<[String: String]> = try await self.request(path: "/salons/\(salonId)/services", method: "PUT", body: request)
+    }
+    
+    func getSalonHours(salonId: UUID) async throws -> [BusinessHourItem] {
+        let response: APIResponse<[BusinessHourItem]> = try await request(path: "/salons/\(salonId)/hours")
+        return response.data ?? []
+    }
+    
+    func updateSalonHours(salonId: UUID, _ request: UpdateBusinessHoursRequest) async throws -> [BusinessHourItem] {
+        let response: APIResponse<[BusinessHourItem]> = try await self.request(path: "/salons/\(salonId)/hours", method: "PUT", body: request)
+        return response.data ?? []
+    }
+
+    // MARK: - Promotions
+    
+    func getPromotions(salonId: UUID? = nil) async throws -> [Promotion] {
+        var queryItems: [URLQueryItem]? = nil
+        if let salonId {
+            queryItems = [URLQueryItem(name: "salonId", value: salonId.uuidString)]
+        }
+        let response: APIResponse<[Promotion]> = try await request(path: "/promotions", queryItems: queryItems)
+        return response.data ?? []
+    }
+    
+    func getActivePromotions(salonId: UUID? = nil) async throws -> [Promotion] {
+        var queryItems: [URLQueryItem]? = nil
+        if let salonId {
+            queryItems = [URLQueryItem(name: "salonId", value: salonId.uuidString)]
+        }
+        let response: APIResponse<[Promotion]> = try await request(path: "/promotions/active", queryItems: queryItems)
         return response.data ?? []
     }
     
@@ -339,12 +399,16 @@ final class APIClient {
     
     // MARK: - Appointments
     
-    func getAppointments(date: String? = nil) async throws -> [Appointment] {
-        var queryItems: [URLQueryItem]? = nil
+    func getAppointments(date: String? = nil, salonId: UUID? = nil) async throws -> [Appointment] {
+        var queryItems: [URLQueryItem] = []
         if let date {
-            queryItems = [URLQueryItem(name: "date", value: date)]
+            queryItems.append(URLQueryItem(name: "date", value: date))
         }
-        let response: APIResponse<[Appointment]> = try await request(path: "/appointments", queryItems: queryItems)
+        if let salonId {
+            queryItems.append(URLQueryItem(name: "salonId", value: salonId.uuidString))
+        }
+        let items = queryItems.isEmpty ? nil : queryItems
+        let response: APIResponse<[Appointment]> = try await request(path: "/appointments", queryItems: items)
         return response.data ?? []
     }
     
@@ -372,14 +436,22 @@ final class APIClient {
     
     // MARK: - Dashboard
     
-    func getDashboard() async throws -> DashboardData {
-        let response: APIResponse<DashboardData> = try await request(path: "/dashboard")
+    func getDashboard(salonId: UUID? = nil) async throws -> DashboardData {
+        var queryItems: [URLQueryItem]? = nil
+        if let salonId {
+            queryItems = [URLQueryItem(name: "salonId", value: salonId.uuidString)]
+        }
+        let response: APIResponse<DashboardData> = try await request(path: "/dashboard", queryItems: queryItems)
         guard let data = response.data else { throw APIError.invalidResponse }
         return data
     }
     
-    func getAdvancedStats() async throws -> AdvancedStats {
-        let response: APIResponse<AdvancedStats> = try await request(path: "/dashboard/stats")
+    func getAdvancedStats(salonId: UUID? = nil) async throws -> AdvancedStats {
+        var queryItems: [URLQueryItem]? = nil
+        if let salonId {
+            queryItems = [URLQueryItem(name: "salonId", value: salonId.uuidString)]
+        }
+        let response: APIResponse<AdvancedStats> = try await request(path: "/dashboard/stats", queryItems: queryItems)
         guard let data = response.data else { throw APIError.invalidResponse }
         return data
     }
@@ -458,11 +530,12 @@ final class APIClient {
     
     // MARK: - Expenses
     
-    func getExpenses(month: String? = nil, category: String? = nil) async throws -> [Expense] {
+    func getExpenses(month: String? = nil, category: String? = nil, salonId: UUID? = nil) async throws -> [Expense] {
         var path = "/expenses"
         var queryItems: [String] = []
         if let month { queryItems.append("month=\(month)") }
         if let category { queryItems.append("category=\(category)") }
+        if let salonId { queryItems.append("salonId=\(salonId.uuidString)") }
         if !queryItems.isEmpty { path += "?" + queryItems.joined(separator: "&") }
         let response: APIResponse<[Expense]> = try await request(path: path)
         return response.data ?? []

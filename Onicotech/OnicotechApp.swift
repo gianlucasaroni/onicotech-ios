@@ -10,6 +10,7 @@ import SwiftUI
 @main
 struct OnicotechApp: App {
     @StateObject private var authManager = AuthenticationManager()
+    @StateObject private var salonManager = SalonManager()
     
     init() {
         KingfisherConfigurator.configure()
@@ -19,6 +20,7 @@ struct OnicotechApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(authManager)
+                .environmentObject(salonManager)
         }
     }
 }

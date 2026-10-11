@@ -2,11 +2,13 @@ import SwiftUI
 
 struct PromotionFormView: View {
     @Environment(\.dismiss) var dismiss
+    @EnvironmentObject var salonManager: SalonManager
     @ObservedObject var viewModel: PromotionViewModel
     var promotionToEdit: Promotion?
     
     @State private var name = ""
     @State private var description = ""
+    @State private var selectedSalonId: UUID?
     @State private var discountPercent: Double = 10
     @State private var active = true
     @State private var hasStartDate = false
@@ -33,6 +35,17 @@ struct PromotionFormView: View {
                     }
                     
                     Toggle("Attiva", isOn: $active)
+                }
+                
+                if !salonManager.salons.isEmpty {
+                    Section("Sede") {
+                        Picker("Sede", selection: $selectedSalonId) {
+                            Text("Tutte le Sedi / Globale").tag(nil as UUID?)
+                            ForEach(salonManager.salons) { salon in
+                                Text(salon.name + (salon.isDefault ? " (Predefinita)" : "")).tag(salon.id as UUID?)
+                            }
+                        }
+                    }
                 }
                 
                 Section("Validità") {
@@ -77,7 +90,7 @@ struct PromotionFormView: View {
                 }
             }
             .navigationTitle(isEditing ? "Modifica Promozione" : "Nuova Promozione")
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineNavigationTitle()
             .task {
                 await clientViewModel.loadClients()
             }
@@ -109,6 +122,9 @@ struct PromotionFormView: View {
                     if let clients = promo.clientIds {
                         selectedClients = Set(clients)
                     }
+                    selectedSalonId = promo.salonId
+                } else {
+                    selectedSalonId = salonManager.selectedSalonId ?? salonManager.defaultSalon?.id
                 }
             }
         }
@@ -118,6 +134,7 @@ struct PromotionFormView: View {
         let newPromo = Promotion(
             id: promotionToEdit?.id ?? UUID(),
             userId: UUID(), // Placeholder, backend sets this
+            salonId: selectedSalonId,
             name: name,
             description: description.isEmpty ? nil : description,
             discountPercent: discountPercent,
