@@ -286,6 +286,17 @@ final class APIClient {
         return response.data ?? []
     }
     
+    func getRecallClients(days: Int = 21, salonId: UUID? = nil) async throws -> [ClientRecall] {
+        var queryItems: [URLQueryItem] = [
+            URLQueryItem(name: "days", value: "\(days)")
+        ]
+        if let salonId = salonId {
+            queryItems.append(URLQueryItem(name: "salonId", value: salonId.uuidString))
+        }
+        let response: APIResponse<[ClientRecall]> = try await request(path: "/clients/recall", queryItems: queryItems)
+        return response.data ?? []
+    }
+    
     // MARK: - Services
     
     func getServices() async throws -> [Service] {

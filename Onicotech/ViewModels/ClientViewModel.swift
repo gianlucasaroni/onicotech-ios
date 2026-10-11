@@ -6,6 +6,9 @@ import Observation
 class ClientViewModel {
     var clients: [Client] = []
     var isLoading = false
+    var recallClients: [ClientRecall] = []
+    var isRecallLoading = false
+    var recallDaysFilter = 21
     var errorMessage: String?
     var showError = false
     
@@ -21,6 +24,25 @@ class ClientViewModel {
             showError = true
         }
         isLoading = false
+    }
+    
+    func loadRecallClients(days: Int? = nil, salonId: UUID? = nil) async {
+        let filterDays = days ?? recallDaysFilter
+        recallDaysFilter = filterDays
+        isRecallLoading = true
+        do {
+            recallClients = try await api.getRecallClients(days: filterDays, salonId: salonId)
+        } catch {
+            errorMessage = error.localizedDescription
+            showError = true
+        }
+        isRecallLoading = false
+    }
+    
+    func loadAll(days: Int? = nil, salonId: UUID? = nil) async {
+        async let c: () = loadClients()
+        async let r: () = loadRecallClients(days: days, salonId: salonId)
+        _ = await (c, r)
     }
     
     func createClient(_ client: Client) async -> Bool {

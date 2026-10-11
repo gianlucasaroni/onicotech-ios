@@ -18,3 +18,15 @@ struct Client: Codable, Identifiable, Hashable {
         "\(firstName) \(lastName)"
     }
 }
+
+struct ClientRecall: Codable, Identifiable, Hashable {
+    var id: UUID { client.id ?? UUID() }
+    var client: Client
+    var lastAppointmentId: String
+    var lastAppointmentDate: String
+    var daysSinceLastAppointment: Int
+    var weeksSinceLastAppointment: Int
+    var lastServices: [String]
+    var salonId: UUID?
+    var salonName: String?
+}
