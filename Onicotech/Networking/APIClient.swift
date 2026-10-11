@@ -57,8 +57,8 @@ final class APIClient {
     
     // MARK: - Change this to your backend URL
     //static let baseServerURL = "http://192.168.1.166:8282/api/v1"
-    //static let baseServerURL = "http://192.168.1.14:8282/api/v1"
-    static let baseServerURL = "http://be-onicotech.casaperoni/api/v1"
+    static let baseServerURL = "http://192.168.1.14:8282/api/v1"
+    //static let baseServerURL = "http://be-onicotech.casaperoni/api/v1"
     
     private var isRefreshing = false
     
@@ -610,5 +610,74 @@ final class APIClient {
     
     func deleteExpensePhoto(id: UUID) async throws {
         try await requestNoContent(path: "/expense-photos/\(id)", method: "DELETE")
+    }
+    
+    // MARK: - Products & Stock (P4)
+    func getProducts(salonId: UUID? = nil, search: String? = nil, category: String? = nil, lowStock: Bool? = nil) async throws -> [Product] {
+        var queryItems: [String] = []
+        if let salonId { queryItems.append("salonId=\(salonId.uuidString)") }
+        if let search, !search.isEmpty { queryItems.append("search=\(search.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? search)") }
+        if let category, !category.isEmpty { queryItems.append("category=\(category.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? category)") }
+        if let lowStock, lowStock { queryItems.append("lowStock=true") }
+        
+        var path = "/products"
+        if !queryItems.isEmpty { path += "?" + queryItems.joined(separator: "&") }
+        
+        let response: APIResponse<[Product]> = try await request(path: path)
+        return response.data ?? []
+    }
+    
+    func getProduct(id: UUID) async throws -> Product {
+        let response: APIResponse<Product> = try await request(path: "/products/\(id)")
+        guard let data = response.data else { throw APIError.invalidResponse }
+        return data
+    }
+    
+    func createProduct(_ req: CreateProductRequest) async throws -> Product {
+        let response: APIResponse<Product> = try await request(path: "/products", method: "POST", body: req)
+        guard let data = response.data else { throw APIError.invalidResponse }
+        return data
+    }
+    
+    func updateProduct(id: UUID, _ req: UpdateProductRequest) async throws -> Product {
+        let response: APIResponse<Product> = try await request(path: "/products/\(id)", method: "PUT", body: req)
+        guard let data = response.data else { throw APIError.invalidResponse }
+        return data
+    }
+    
+    func deleteProduct(id: UUID) async throws {
+        try await requestNoContent(path: "/products/\(id)", method: "DELETE")
+    }
+    
+    func adjustStock(productId: UUID, salonId: UUID, delta: Int? = nil, quantity: Int? = nil) async throws -> ProductStock {
+        let req = AdjustStockRequest(salonId: salonId, delta: delta, quantity: quantity)
+        let response: APIResponse<ProductStock> = try await request(path: "/products/\(productId)/stock", method: "POST", body: req)
+        guard let data = response.data else { throw APIError.invalidResponse }
+        return data
+    }
+    
+    // MARK: - Product Sales (P4)
+    func getProductSales(salonId: UUID? = nil, clientId: UUID? = nil, startDate: String? = nil, endDate: String? = nil) async throws -> [ProductSale] {
+        var queryItems: [String] = []
+        if let salonId { queryItems.append("salonId=\(salonId.uuidString)") }
+        if let clientId { queryItems.append("clientId=\(clientId.uuidString)") }
+        if let startDate { queryItems.append("startDate=\(startDate)") }
+        if let endDate { queryItems.append("endDate=\(endDate)") }
+        
+        var path = "/product-sales"
+        if !queryItems.isEmpty { path += "?" + queryItems.joined(separator: "&") }
+        
+        let response: APIResponse<[ProductSale]> = try await request(path: path)
+        return response.data ?? []
+    }
+    
+    func createProductSale(_ req: CreateProductSaleRequest) async throws -> ProductSale {
+        let response: APIResponse<ProductSale> = try await request(path: "/product-sales", method: "POST", body: req)
+        guard let data = response.data else { throw APIError.invalidResponse }
+        return data
+    }
+    
+    func deleteProductSale(id: UUID) async throws {
+        try await requestNoContent(path: "/product-sales/\(id)", method: "DELETE")
     }
 }

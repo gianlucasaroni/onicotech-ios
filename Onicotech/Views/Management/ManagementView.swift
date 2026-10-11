@@ -13,6 +13,10 @@ struct ManagementView: View {
                         Label("Servizi", systemImage: "scissors")
                     }
                     
+                    NavigationLink(destination: ProductListView()) {
+                        Label("Prodotti & Magazzino", systemImage: "shippingbox.fill")
+                    }
+                    
                     NavigationLink(destination: PromotionListView()) {
                         Label("Promozioni", systemImage: "tag.fill")
                     }
