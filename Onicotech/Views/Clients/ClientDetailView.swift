@@ -51,8 +51,100 @@ struct ClientDetailView: View {
         }
     }
     
+    private var tagColor: Color {
+        switch (client.customerTag ?? "").lowercased() {
+        case "vip": return .orange
+        case "nuova cliente", "nuova": return .purple
+        case "fedele": return .green
+        case "super puntuale", "puntuale": return .blue
+        case "esigente": return .indigo
+        default: return .secondary
+        }
+    }
+    
     var body: some View {
         List {
+            // Scheda Tecnica Nail & Sicurezza
+            Section {
+                if let allergies = client.allergies, !allergies.isEmpty {
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.title3)
+                            .foregroundStyle(.red)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("ATTENZIONE ALLERGIE / SICUREZZA")
+                                .font(.caption.bold())
+                                .foregroundStyle(.red)
+                            Text(allergies)
+                                .font(.subheadline.bold())
+                                .foregroundStyle(.primary)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                    .listRowBackground(Color.red.opacity(0.08))
+                }
+                
+                if let tag = client.customerTag, !tag.isEmpty {
+                    HStack {
+                        Label("Tag Profilo", systemImage: "person.crop.circle.badge.checkmark")
+                        Spacer()
+                        Text(tag)
+                            .font(.subheadline.bold())
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(tagColor.opacity(0.15))
+                            .foregroundStyle(tagColor)
+                            .clipShape(Capsule())
+                    }
+                }
+                
+                if let nailType = client.nailType, !nailType.isEmpty {
+                    HStack {
+                        Label("Tipologia Unghia", systemImage: "sparkles")
+                        Spacer()
+                        Text(nailType)
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.primary)
+                    }
+                }
+                
+                if let shape = client.preferredShape, !shape.isEmpty {
+                    HStack {
+                        Label("Forma Preferita", systemImage: "hand.raised")
+                        Spacer()
+                        Text(shape)
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.primary)
+                    }
+                }
+                
+                if let techNotes = client.technicalNotes, !techNotes.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Label("Basi, Costruttore e Colori", systemImage: "paintpalette")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Text(techNotes)
+                            .font(.subheadline)
+                    }
+                }
+                
+                if (client.nailType == nil || client.nailType!.isEmpty) &&
+                   (client.allergies == nil || client.allergies!.isEmpty) &&
+                   (client.preferredShape == nil || client.preferredShape!.isEmpty) &&
+                   (client.technicalNotes == nil || client.technicalNotes!.isEmpty) &&
+                   (client.customerTag == nil || client.customerTag!.isEmpty) {
+                    Button {
+                        showingEditSheet = true
+                    } label: {
+                        Label("Compila Scheda Tecnica Nail", systemImage: "plus.circle")
+                            .font(.subheadline)
+                            .foregroundStyle(.purple)
+                    }
+                }
+            } header: {
+                Text("Scheda Tecnica Nail & Sicurezza")
+            }
+            
             // Client info section
             Section {
                 if let phone = client.phone, !phone.isEmpty {

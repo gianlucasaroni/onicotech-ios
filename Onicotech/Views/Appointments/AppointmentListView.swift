@@ -240,8 +240,33 @@ struct AppointmentRowView: View {
             }
             
             if let client = appointment.client {
-                Label(client.fullName, systemImage: "person")
-                    .font(.subheadline)
+                HStack(spacing: 6) {
+                    Label(client.fullName, systemImage: "person")
+                        .font(.subheadline)
+                    
+                    if let tag = client.customerTag, !tag.isEmpty {
+                        Text(tag)
+                            .font(.caption2.bold())
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(Color.purple.opacity(0.12))
+                            .foregroundStyle(.purple)
+                            .clipShape(Capsule())
+                    }
+                    
+                    if let allergies = client.allergies, !allergies.isEmpty {
+                        HStack(spacing: 2) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                            Text(allergies)
+                        }
+                        .font(.caption2.bold())
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(Color.red.opacity(0.12))
+                        .foregroundStyle(.red)
+                        .clipShape(Capsule())
+                    }
+                }
             }
             
             if let services = appointment.services, !services.isEmpty {

@@ -114,10 +114,58 @@ struct ClientListView: View {
 struct ClientRowView: View {
     let client: Client
     
+    private var tagColor: Color {
+        switch (client.customerTag ?? "").lowercased() {
+        case "vip": return .orange
+        case "nuova cliente", "nuova": return .purple
+        case "fedele": return .green
+        case "super puntuale", "puntuale": return .blue
+        case "esigente": return .indigo
+        default: return .secondary
+        }
+    }
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(client.fullName)
-                .font(.headline)
+            HStack(spacing: 6) {
+                Text(client.fullName)
+                    .font(.headline)
+                
+                if let tag = client.customerTag, !tag.isEmpty {
+                    Text(tag)
+                        .font(.caption2.bold())
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(tagColor.opacity(0.15))
+                        .foregroundStyle(tagColor)
+                        .clipShape(Capsule())
+                }
+            }
+            
+            if let allergies = client.allergies, !allergies.isEmpty {
+                HStack(spacing: 4) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.caption2)
+                    Text(allergies)
+                        .font(.caption2.bold())
+                }
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Color.red.opacity(0.12))
+                .foregroundStyle(.red)
+                .clipShape(Capsule())
+            }
+            
+            if let nailType = client.nailType, !nailType.isEmpty {
+                HStack(spacing: 4) {
+                    Image(systemName: "sparkles")
+                        .font(.caption2)
+                        .foregroundStyle(.purple)
+                    Text(nailType + (client.preferredShape.map { " • \($0)" } ?? ""))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
             
             if let phone = client.phone, !phone.isEmpty {
                 Label(phone, systemImage: "phone")

@@ -151,7 +151,56 @@ struct AppointmentDetailView: View {
             // Client
             if let client = appointment.client {
                 Section("Cliente") {
-                    Label(client.fullName, systemImage: "person")
+                    HStack {
+                        Label(client.fullName, systemImage: "person")
+                        Spacer()
+                        if let tag = client.customerTag, !tag.isEmpty {
+                            Text(tag)
+                                .font(.caption2.bold())
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.purple.opacity(0.15))
+                                .foregroundStyle(.purple)
+                                .clipShape(Capsule())
+                        }
+                    }
+                    
+                    if let allergies = client.allergies, !allergies.isEmpty {
+                        HStack(alignment: .top, spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.red)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("ATTENZIONE ALLERGIE / SICUREZZA")
+                                    .font(.caption2.bold())
+                                    .foregroundStyle(.red)
+                                Text(allergies)
+                                    .font(.subheadline.bold())
+                                    .foregroundStyle(.primary)
+                            }
+                        }
+                        .padding(.vertical, 2)
+                        .listRowBackground(Color.red.opacity(0.08))
+                    }
+                    
+                    if let nailType = client.nailType, !nailType.isEmpty {
+                        HStack {
+                            Label("Tipologia Unghie", systemImage: "sparkles")
+                            Spacer()
+                            Text(nailType + (client.preferredShape.map { " • \($0)" } ?? ""))
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    
+                    if let techNotes = client.technicalNotes, !techNotes.isEmpty {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Label("Note Tecniche & Basi", systemImage: "paintpalette")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(techNotes)
+                                .font(.subheadline)
+                        }
+                    }
                     
                     if let phone = client.phone, !phone.isEmpty {
                         HStack(spacing: 12) {
