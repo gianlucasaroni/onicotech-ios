@@ -43,6 +43,11 @@ struct User: Codable {
     let firstName: String
     let lastName: String
     let email: String
+    var role: String?
+    
+    var isOwner: Bool {
+        role != "staff"
+    }
 }
 
 // MARK: - Notifications
@@ -679,5 +684,11 @@ final class APIClient {
     
     func deleteProductSale(id: UUID) async throws {
         try await requestNoContent(path: "/product-sales/\(id)", method: "DELETE")
+    }
+    
+    // MARK: - Salon Staff
+    func getSalonStaff(salonId: UUID) async throws -> [SalonMember] {
+        let response: APIResponse<[SalonMember]> = try await request(path: "/salons/\(salonId.uuidString)/staff")
+        return response.data ?? []
     }
 }

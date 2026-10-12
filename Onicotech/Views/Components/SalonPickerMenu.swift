@@ -51,6 +51,16 @@ struct SalonPickerMenu: View {
                     .foregroundStyle(.primary)
                     .lineLimit(1)
                 
+                if salonManager.activeRole == "staff" {
+                    Text("Staff")
+                        .font(.caption2.bold())
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(Color.blue.opacity(0.15))
+                        .foregroundStyle(.blue)
+                        .clipShape(Capsule())
+                }
+                
                 if salonManager.hasMultipleSalons {
                     Image(systemName: "chevron.down")
                         .font(.caption2)

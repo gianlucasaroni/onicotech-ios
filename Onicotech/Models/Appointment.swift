@@ -47,6 +47,8 @@ struct Appointment: Codable, Identifiable {
     var client: Client?
     var salonId: UUID?
     var salon: Salon?
+    var staffMemberId: UUID?
+    var staffMember: SalonMember?
     var services: [Service]?
     var serviceIds: [UUID]?
     var products: [AppointmentProduct]?
@@ -76,6 +78,7 @@ struct CreateAppointmentRequest: Codable {
     var startTime: String
     var clientId: UUID
     var salonId: UUID?
+    var staffMemberId: UUID?
     var serviceIds: [UUID]
     var notes: String?
     var promotionId: UUID?
@@ -86,6 +89,7 @@ struct UpdateAppointmentRequest: Codable {
     var startTime: String
     var clientId: UUID
     var salonId: UUID?
+    var staffMemberId: UUID?
     var serviceIds: [UUID]
     var notes: String?
     var promotionId: UUID?

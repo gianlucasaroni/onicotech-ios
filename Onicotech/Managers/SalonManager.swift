@@ -6,10 +6,15 @@ import Combine
 final class SalonManager: ObservableObject {
     @Published var salons: [Salon] = []
     @Published var selectedSalon: Salon? = nil
+    @Published var activeRole: String = "owner"
     @Published var isLoading = false
     @Published var errorMessage: String? = nil
     
     private let userDefaultsKey = "selectedSalonId"
+    
+    var isOwner: Bool {
+        activeRole != "staff"
+    }
     
     var selectedSalonId: UUID? {
         selectedSalon?.id

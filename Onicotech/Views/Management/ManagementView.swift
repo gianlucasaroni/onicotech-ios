@@ -1,6 +1,13 @@
 import SwiftUI
 
 struct ManagementView: View {
+    @EnvironmentObject var salonManager: SalonManager
+    @EnvironmentObject var authManager: AuthenticationManager
+    
+    private var isOwner: Bool {
+        (authManager.user?.isOwner ?? true) && salonManager.isOwner
+    }
+    
     var body: some View {
         NavigationStack {
             List {
@@ -21,12 +28,14 @@ struct ManagementView: View {
                         Label("Promozioni", systemImage: "tag.fill")
                     }
                     
-                    NavigationLink(destination: ExpenseListView()) {
-                        Label("Spese", systemImage: "creditcard.fill")
-                    }
-                    
-                    NavigationLink(destination: TaxCalculatorView()) {
-                        Label("Calcolatore Fiscale", systemImage: "percent")
+                    if isOwner {
+                        NavigationLink(destination: ExpenseListView()) {
+                            Label("Spese", systemImage: "creditcard.fill")
+                        }
+                        
+                        NavigationLink(destination: TaxCalculatorView()) {
+                            Label("Calcolatore Fiscale", systemImage: "percent")
+                        }
                     }
                 }
                 

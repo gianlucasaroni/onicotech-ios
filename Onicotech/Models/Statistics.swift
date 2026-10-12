@@ -75,3 +75,44 @@ struct MonthlyRevenue: Codable, Identifiable {
         return f.string(from: d)
     }
 }
+
+public struct StaffPerformance: Codable, Identifiable, Hashable {
+    public var id: UUID { staffMemberId }
+    public let staffMemberId: UUID
+    public let displayName: String
+    public let color: String?
+    public let role: String
+    public let serviceCommissionRate: Int
+    public let productCommissionRate: Int
+    public let completedTreatments: Int
+    public let serviceRevenue: Int64
+    public let serviceCommissionEarned: Int64
+    public let retailProductsSold: Int
+    public let retailRevenue: Int64
+    public let productCommissionEarned: Int64
+    public let totalCommissionEarned: Int64
+    public let salonNetRevenue: Int64
+    
+    public var formattedServiceRevenue: String {
+        String(format: "€%.2f", Double(serviceRevenue) / 100.0)
+    }
+    
+    public var formattedTotalEarned: String {
+        String(format: "€%.2f", Double(totalCommissionEarned) / 100.0)
+    }
+    
+    public var formattedNetRevenue: String {
+        String(format: "€%.2f", Double(salonNetRevenue) / 100.0)
+    }
+}
+
+public struct StaffReportData: Codable {
+    public let startDate: String
+    public let endDate: String
+    public let staff: [StaffPerformance]
+    public let totalSalonServiceRevenue: Int64
+    public let totalSalonProductRevenue: Int64
+    public let totalSalonRevenue: Int64
+    public let totalStaffCommissions: Int64
+    public let totalSalonNet: Int64
+}

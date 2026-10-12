@@ -244,6 +244,21 @@ struct AppointmentRowView: View {
                     Label(client.fullName, systemImage: "person")
                         .font(.subheadline)
                     
+                    if let staff = appointment.staffMember {
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(Color(hex: staff.color ?? "#9333EA"))
+                                .frame(width: 7, height: 7)
+                            Text(staff.displayName)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.secondary.opacity(0.1))
+                        .clipShape(Capsule())
+                    }
+                    
                     if let tag = client.customerTag, !tag.isEmpty {
                         Text(tag)
                             .font(.caption2.bold())
