@@ -24,6 +24,10 @@ struct ManagementView: View {
                     NavigationLink(destination: ExpenseListView()) {
                         Label("Spese", systemImage: "creditcard.fill")
                     }
+                    
+                    NavigationLink(destination: TaxCalculatorView()) {
+                        Label("Calcolatore Fiscale", systemImage: "percent")
+                    }
                 }
                 
                 Section("Account") {
