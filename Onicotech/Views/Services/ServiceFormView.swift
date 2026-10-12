@@ -10,6 +10,7 @@ struct ServiceFormView: View {
     @State private var description = ""
     @State private var priceText = ""
     @State private var durationText = ""
+    @State private var showInOnlineBooking = true
     @State private var active = true
     @State private var isSaving = false
     
@@ -43,6 +44,13 @@ struct ServiceFormView: View {
                     }
                 }
                 
+                Section("Prenotazione Online") {
+                    Toggle("Visibile nella Prenotazione Online", isOn: $showInOnlineBooking)
+                    Text("Se attivo, le clienti potranno selezionare questo trattamento dalla pagina web di prenotazione.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                
                 if isEditing {
                     Section {
                         Toggle("Attivo", isOn: $active)
@@ -69,6 +77,7 @@ struct ServiceFormView: View {
                     let priceDecimal = Double(service.price) / 100.0
                     priceText = String(format: "%.2f", priceDecimal)
                     durationText = "\(service.duration)"
+                    showInOnlineBooking = service.showInOnlineBooking ?? true
                     active = service.active
                 }
             }
@@ -86,7 +95,8 @@ struct ServiceFormView: View {
             description: description.isEmpty ? nil : description,
             price: Int(priceValue),
             duration: Int(durationText) ?? 0,
-            active: active
+            active: active,
+            showInOnlineBooking: showInOnlineBooking
         )
         
         let success: Bool

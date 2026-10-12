@@ -250,11 +250,33 @@ struct AppointmentDetailView: View {
                     }
                     
                     HStack {
-                        Text("Totale")
+                        Text("Totale Trattamenti")
                             .fontWeight(.semibold)
                         Spacer()
                         Text(appointment.formattedTotalPrice)
                             .fontWeight(.semibold)
+                    }
+                }
+            }
+            
+            // Reserved Products
+            if let products = appointment.products, !products.isEmpty {
+                Section("Prodotti Riservati (Ritiro in Salone)") {
+                    ForEach(products) { item in
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("\(item.quantity)x \(item.product?.name ?? "Prodotto")")
+                                    .font(.body)
+                                if let cat = item.product?.category {
+                                    Text(cat)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            Spacer()
+                            Text(item.formattedSubtotal)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
             }

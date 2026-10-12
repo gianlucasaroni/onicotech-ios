@@ -7,6 +7,7 @@ struct Service: Codable, Identifiable {
     var price: Int // cents
     var duration: Int // minutes
     var active: Bool
+    var showInOnlineBooking: Bool?
 
     var formattedPrice: String {
         let value = Double(price) / 100.0

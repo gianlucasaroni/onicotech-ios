@@ -49,6 +49,7 @@ struct Appointment: Codable, Identifiable {
     var salon: Salon?
     var services: [Service]?
     var serviceIds: [UUID]?
+    var products: [AppointmentProduct]?
     var totalPrice: Int? // cents
     var discountAmount: Int? // cents
     var finalPrice: Int? // cents
@@ -90,3 +91,21 @@ struct UpdateAppointmentRequest: Codable {
     var promotionId: UUID?
     var status: AppointmentStatus
 }
+
+struct AppointmentProduct: Codable, Identifiable {
+    var id: UUID?
+    var appointmentId: UUID?
+    var productId: UUID
+    var product: Product?
+    var quantity: Int
+    var unitPrice: Int // cents
+    
+    var formattedUnitPrice: String {
+        CurrencyFormatting.euros(fromCents: unitPrice)
+    }
+    
+    var formattedSubtotal: String {
+        CurrencyFormatting.euros(fromCents: unitPrice * quantity)
+    }
+}
+

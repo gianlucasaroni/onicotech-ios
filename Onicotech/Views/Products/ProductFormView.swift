@@ -14,6 +14,7 @@ struct ProductFormView: View {
     @State private var priceEurosText: String = "12.00"
     @State private var costEurosText: String = "5.00"
     @State private var minStockAlertText: String = "3"
+    @State private var showInOnlineBooking: Bool = false
     @State private var initialStockMap: [UUID: String] = [:]
     @State private var isSubmitting = false
     
@@ -91,6 +92,13 @@ struct ProductFormView: View {
                         .foregroundStyle(.secondary)
                 }
                 
+                Section("Prenotazione Online & Cross-Selling") {
+                    Toggle("Consiglia nella Prenotazione Online", isOn: $showInOnlineBooking)
+                    Text("Se attivo, il prodotto verrà proposto alle clienti per la cura a casa subito dopo aver scelto il trattamento online.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                
                 if !isEditing && !salonManager.salons.isEmpty {
                     Section("Giacenze Iniziali per Sede") {
                         ForEach(salonManager.salons) { salon in
@@ -137,6 +145,7 @@ struct ProductFormView: View {
                     priceEurosText = String(format: "%.2f", Double(p.price) / 100.0)
                     costEurosText = String(format: "%.2f", Double(p.cost) / 100.0)
                     minStockAlertText = "\(p.minStockAlert)"
+                    showInOnlineBooking = p.showInOnlineBooking ?? false
                 } else {
                     for salon in salonManager.salons {
                         initialStockMap[salon.id] = "0"
@@ -164,6 +173,7 @@ struct ProductFormView: View {
                 price: priceCents,
                 cost: costCents,
                 minStockAlert: minAlert,
+                showInOnlineBooking: showInOnlineBooking,
                 active: p.active
             )
             let success = await viewModel.updateProduct(id: p.id, req)
@@ -188,6 +198,7 @@ struct ProductFormView: View {
                 cost: costCents,
                 minStockAlert: minAlert,
                 active: true,
+                showInOnlineBooking: showInOnlineBooking,
                 initialStocks: stocks.isEmpty ? nil : stocks
             )
             

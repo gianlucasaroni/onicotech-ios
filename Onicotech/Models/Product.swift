@@ -28,6 +28,7 @@ struct Product: Codable, Identifiable, Hashable {
     var cost: Int // In cents
     var minStockAlert: Int
     var active: Bool
+    var showInOnlineBooking: Bool?
     var stocks: [ProductStock]?
     var totalStock: Int?
     var createdAt: String?
@@ -68,6 +69,7 @@ struct CreateProductRequest: Codable {
     var cost: Int
     var minStockAlert: Int
     var active: Bool
+    var showInOnlineBooking: Bool?
     var initialStocks: [String: Int]? // salonId -> qty
 }
 
@@ -79,6 +81,7 @@ struct UpdateProductRequest: Codable {
     var price: Int
     var cost: Int
     var minStockAlert: Int
+    var showInOnlineBooking: Bool?
     var active: Bool?
 }
 
