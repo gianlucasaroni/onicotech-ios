@@ -5,7 +5,7 @@ struct TaxCalculatorView: View {
     @State private var amountString: String = "100"
     
     @State private var selectedRegime: TaxRegime = .forfettarioStartup5
-    @State private var selectedAteco: String = "96.02.03"
+    @State private var selectedAteco: String = "96.22.01"
     @State private var selectedPension: PensionType = .inpsCraftsmen
     @State private var hasInpsDiscount35: Bool = true
     @State private var materialCostPercent: Double = 10.0
@@ -200,7 +200,7 @@ struct TaxCalculatorView: View {
                 Text("• Regime Forfettario: esente da IVA e ritenuta d'acconto (L. 190/2014). Limite ricavi annuo: 85.000 €.")
                     .font(.footnote)
                     .foregroundColor(.secondary)
-                Text("• ATECO 96.02.03: il 67% dei ricavi è imponibile; il 33% è riconosciuto forfettariamente come spesa senza giustificativi.")
+                Text("• ATECO 96.22.01 / 96.02.03: il 67% dei ricavi è imponibile; il 33% è riconosciuto forfettariamente come spesa senza giustificativi.")
                     .font(.footnote)
                     .foregroundColor(.secondary)
             }

@@ -49,9 +49,16 @@ struct AtecoDetail: Codable, Identifiable {
 
 let beautyAtecoCodes: [AtecoDetail] = [
     AtecoDetail(
+        code: "96.22.01",
+        title: "Servizi di manicure e pedicure (ATECO 2025)",
+        description: "Nuovo codice ISTAT 2025 dedicato: ricostruzione unghie, nail art, semipermanente, pedicure.",
+        profitabilityCoeff: 0.67,
+        category: "Servizi alla persona"
+    ),
+    AtecoDetail(
         code: "96.02.03",
-        title: "Servizi di manicure e pedicure",
-        description: "Ricostruzione unghie, nail art, manicure e pedicure estetico.",
+        title: "Servizi di manicure e pedicure (ATECO 2007 - Storico)",
+        description: "Codice precedente ISTAT 2007/2022, ancora presente nelle partite IVA già avviate.",
         profitabilityCoeff: 0.67,
         category: "Servizi alla persona"
     ),
