@@ -9,6 +9,8 @@ public struct SalonMember: Codable, Identifiable, Hashable {
     public var displayName: String
     public var color: String?
     public var active: Bool
+    public var canViewAllClients: Bool?
+    public var maskClientPhone: Bool?
     public var serviceCommissionRate: Int?
     public var productCommissionRate: Int?
     public var createdAt: Date?
@@ -22,6 +24,8 @@ public struct SalonMember: Codable, Identifiable, Hashable {
         displayName: String,
         color: String? = nil,
         active: Bool = true,
+        canViewAllClients: Bool? = true,
+        maskClientPhone: Bool? = false,
         serviceCommissionRate: Int? = 0,
         productCommissionRate: Int? = 0,
         createdAt: Date? = nil
@@ -34,6 +38,8 @@ public struct SalonMember: Codable, Identifiable, Hashable {
         self.displayName = displayName
         self.color = color
         self.active = active
+        self.canViewAllClients = canViewAllClients
+        self.maskClientPhone = maskClientPhone
         self.serviceCommissionRate = serviceCommissionRate
         self.productCommissionRate = productCommissionRate
         self.createdAt = createdAt

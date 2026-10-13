@@ -347,20 +347,34 @@ struct ClientRecallRowView: View {
             // Action Buttons
             HStack(spacing: 8) {
                 if let phone = item.client.phone, !phone.isEmpty {
-                    Link(destination: whatsappURL) {
+                    if item.client.isPhoneMasked == true {
                         HStack(spacing: 4) {
-                            Image(systemName: "message.fill")
+                            Image(systemName: "lock.fill")
                                 .font(.caption2)
-                            Text("WhatsApp Recall")
+                            Text("WhatsApp (Protetto)")
                                 .font(.caption.bold())
                         }
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
-                        .background(Color.green)
-                        .foregroundStyle(.white)
+                        .background(Color.secondary.opacity(0.15))
+                        .foregroundStyle(.secondary)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
+                    } else {
+                        Link(destination: whatsappURL) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "message.fill")
+                                    .font(.caption2)
+                                Text("WhatsApp Recall")
+                                    .font(.caption.bold())
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Color.green)
+                            .foregroundStyle(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
                 
                 Button {
@@ -445,7 +459,7 @@ struct ClientRowView: View {
             }
             
             if let phone = client.phone, !phone.isEmpty {
-                Label(phone, systemImage: "phone")
+                Label(phone, systemImage: client.isPhoneMasked == true ? "lock.fill" : "phone")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }

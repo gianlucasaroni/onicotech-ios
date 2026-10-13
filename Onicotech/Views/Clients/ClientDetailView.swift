@@ -149,10 +149,16 @@ struct ClientDetailView: View {
             Section {
                 if let phone = client.phone, !phone.isEmpty {
                     HStack {
-                        Label("Telefono", systemImage: "phone")
+                        Label("Telefono", systemImage: client.isPhoneMasked == true ? "lock.fill" : "phone")
                         Spacer()
-                        Link(phone, destination: URL(string: "tel:\(phone)")!)
-                            .foregroundStyle(.blue)
+                        if client.isPhoneMasked == true {
+                            Text(phone)
+                                .font(.system(.body, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Link(phone, destination: URL(string: "tel:\(phone)")!)
+                                .foregroundStyle(.blue)
+                        }
                     }
                 }
                 

@@ -12,6 +12,7 @@ struct Client: Codable, Identifiable, Hashable {
     var preferredShape: String?
     var technicalNotes: String?
     var customerTag: String?
+    var isPhoneMasked: Bool?
     var promotionIds: [UUID] = []
 
     var fullName: String {

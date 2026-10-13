@@ -126,9 +126,20 @@ struct ClientFormView: View {
                 }
                 
                 Section("Contatti") {
-                    TextField("Telefono", text: $phone)
-                        .textContentType(.telephoneNumber)
-                        .phoneKeyboard()
+                    if client?.isPhoneMasked == true {
+                        HStack {
+                            Label("Telefono", systemImage: "lock.fill")
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text(phone)
+                                .font(.system(.body, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                        }
+                    } else {
+                        TextField("Telefono", text: $phone)
+                            .textContentType(.telephoneNumber)
+                            .phoneKeyboard()
+                    }
                     
                     TextField("Email", text: $email)
                         .textContentType(.emailAddress)
@@ -243,7 +254,7 @@ struct ClientFormView: View {
             id: client?.id,
             firstName: firstName.trimmingCharacters(in: .whitespaces),
             lastName: lastName.trimmingCharacters(in: .whitespaces),
-            phone: phone.isEmpty ? nil : phone,
+            phone: client?.isPhoneMasked == true ? nil : (phone.isEmpty ? nil : phone),
             email: email.isEmpty ? nil : email,
             notes: notes.isEmpty ? nil : notes,
             nailType: nailType.isEmpty ? nil : nailType,
