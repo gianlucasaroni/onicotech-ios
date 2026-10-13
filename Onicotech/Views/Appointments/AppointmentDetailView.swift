@@ -11,6 +11,7 @@ struct AppointmentDetailView: View {
     let initialAppointment: Appointment
     var viewModel: AppointmentViewModel
     
+    @EnvironmentObject var salonManager: SalonManager
     @Environment(\.dismiss) private var dismiss
     
     private var appointment: Appointment {
@@ -58,6 +59,15 @@ struct AppointmentDetailView: View {
                             Text("(\(city))")
                                 .foregroundStyle(.secondary)
                         }
+                    }
+                }
+                
+                if let staff = appointment.staffMember {
+                    HStack {
+                        Label("Operatrice", systemImage: "person.badge.shield.checkmark")
+                        Spacer()
+                        Text(staff.displayName)
+                            .fontWeight(.medium)
                     }
                 }
                 
@@ -227,6 +237,21 @@ struct AppointmentDetailView: View {
                             .buttonStyle(.plain)
                         }
                         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                        
+                        if let staff = appointment.staffMember {
+                            Link(destination: staffWhatsappURL(staff: staff)) {
+                                Label("Invia Scheda ad Operatrice (\(staff.displayName))", systemImage: "arrowshape.turn.up.right.fill")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 8)
+                                    .background(Color.purple.opacity(0.1))
+                                    .foregroundStyle(.purple)
+                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                            }
+                            .buttonStyle(.plain)
+                            .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 8, trailing: 16))
+                        }
                     }
                 }
             }
@@ -412,18 +437,68 @@ struct AppointmentDetailView: View {
         let clean = cleanPhoneNumber(phone)
         let finalPhone = clean.count <= 10 ? "39\(clean)" : clean
         
-        var msg = "Ciao \(appointment.client?.firstName ?? "Cliente"),\nti ricordo il tuo appuntamento del \(formattedDate) alle \(appointment.startTime)."
+        let clientName = appointment.client?.firstName ?? "Cliente"
+        let salon = appointment.salon ?? salonManager.selectedSalon
+        let salonName = salon?.name ?? "Onicotech"
+        let location = (salon?.fullAddress.isEmpty == false) ? "\(salonName) (\(salon!.fullAddress))" : salonName
         
-        if let services = appointment.services, !services.isEmpty {
-            msg += "\n\nServizi:"
-            for service in services {
-                msg += "\n- \(service.name) (\(service.formattedPrice))"
-            }
+        let isStaffSender = salonManager.activeRole == "staff"
+        let assignedStaffName = appointment.staffMember?.displayName
+        
+        var msg = ""
+        if isStaffSender {
+            let staffName = appointment.staffMember?.displayName ?? "la tua operatrice"
+            msg = "Ciao \(clientName)! ✨\nSono \(staffName) di \(salonName).\nTi ricordo il tuo appuntamento per \(formattedDate) alle ore \(appointment.startTime).\n\n"
+        } else if let staffName = assignedStaffName {
+            msg = "Ciao \(clientName)! ✨\nTi ricordiamo il tuo appuntamento con la nostra operatrice \(staffName) presso \(salonName):\n\n📅 Data: \(formattedDate)\n⏰ Orario: ore \(appointment.startTime)\n"
+        } else {
+            msg = "Ciao \(clientName)! ✨\nTi ricordiamo il tuo appuntamento presso \(salonName):\n\n📅 Data: \(formattedDate)\n⏰ Orario: ore \(appointment.startTime)\n"
         }
         
-        msg += "\n\nA presto!"
+        if let services = appointment.services, !services.isEmpty {
+            let sList = services.map { $0.name }.joined(separator: ", ")
+            msg += "💅 Trattamenti: \(sList)\n"
+        }
+        msg += "📍 Sede: \(location)\n"
+        
+        if let apptId = appointment.id {
+            msg += "📲 Scheda e calendario: https://app.onicotech.it/book/\(apptId.uuidString.lowercased())\n"
+        }
+        
+        if isStaffSender {
+            let staffName = appointment.staffMember?.displayName ?? ""
+            msg += "\nA presto, \(staffName)! 💅✨"
+        } else {
+            msg += "\nIl team di \(salonName) 💅✨"
+        }
         
         let encoded = msg.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
         return URL(string: "https://api.whatsapp.com/send?phone=\(finalPhone)&text=\(encoded)") ?? URL(string: "https://api.whatsapp.com/send?phone=\(finalPhone)")!
+    }
+    
+    private func staffWhatsappURL(staff: SalonMember) -> URL {
+        let clientName = appointment.client?.fullName ?? "Cliente"
+        let clientPhone = appointment.client?.phone ?? ""
+        let salon = appointment.salon ?? salonManager.selectedSalon
+        let salonName = salon?.name ?? "Onicotech"
+        
+        var msg = "Ciao \(staff.displayName)! ✨\nTi è stato assegnato un appuntamento in salone:\n\n"
+        msg += "👤 Cliente: \(clientName)\(clientPhone.isEmpty ? "" : " (" + clientPhone + ")")\n"
+        msg += "📅 Data: \(formattedDate) ore \(appointment.startTime)\n"
+        if let services = appointment.services, !services.isEmpty {
+            let sList = services.map { $0.name }.joined(separator: ", ")
+            msg += "💅 Trattamenti: \(sList)\n"
+        }
+        msg += "📍 Sede: \(salonName)\n"
+        if let notes = appointment.notes, !notes.isEmpty {
+            msg += "📝 Note: \(notes)\n"
+        }
+        if let apptId = appointment.id {
+            msg += "📲 Scheda appuntamento: https://app.onicotech.it/book/\(apptId.uuidString.lowercased())\n"
+        }
+        msg += "\nBuon lavoro! 💅"
+        
+        let encoded = msg.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        return URL(string: "https://api.whatsapp.com/send?text=\(encoded)") ?? URL(string: "https://api.whatsapp.com/send")!
     }
 }
