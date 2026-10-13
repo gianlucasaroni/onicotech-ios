@@ -6,6 +6,7 @@ enum AppointmentStatus: String, Codable, CaseIterable {
     case completed
     case cancelled
     case rescheduled
+    case expired
     
     var displayName: String {
         switch self {
@@ -14,6 +15,7 @@ enum AppointmentStatus: String, Codable, CaseIterable {
         case .completed: return "Completato"
         case .cancelled: return "Cancellato"
         case .rescheduled: return "Riprogrammato"
+        case .expired: return "Scaduto"
         }
     }
     
@@ -24,6 +26,7 @@ enum AppointmentStatus: String, Codable, CaseIterable {
         case .completed: return "checkmark.seal.fill"
         case .cancelled: return "xmark.circle.fill"
         case .rescheduled: return "arrow.triangle.2.circlepath.circle.fill"
+        case .expired: return "clock.badge.xmark"
         }
     }
     
@@ -34,6 +37,7 @@ enum AppointmentStatus: String, Codable, CaseIterable {
         case .completed: return "green"
         case .cancelled: return "red"
         case .rescheduled: return "yellow"
+        case .expired: return "gray"
         }
     }
 }
