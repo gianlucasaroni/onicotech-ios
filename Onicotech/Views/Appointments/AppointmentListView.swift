@@ -210,6 +210,7 @@ struct AppointmentRowView: View {
         case .completed: return .green
         case .rescheduled: return .purple
         case .cancelled: return .red
+        case .expired: return .gray
         case .none: return .gray
         }
     }

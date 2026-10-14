@@ -691,4 +691,15 @@ final class APIClient {
         let response: APIResponse<[SalonMember]> = try await request(path: "/salons/\(salonId.uuidString)/staff")
         return response.data ?? []
     }
+    
+    func resetCalendarToken(salonId: UUID, memberId: UUID) async throws -> SalonMember {
+        let response: APIResponse<SalonMember> = try await request(
+            path: "/salons/\(salonId.uuidString)/staff/\(memberId.uuidString)/calendar-token/reset",
+            method: "POST"
+        )
+        guard let data = response.data else {
+            throw APIError.serverError("Impossibile reimpostare il token del calendario")
+        }
+        return data
+    }
 }
