@@ -1,193 +1,107 @@
 import SwiftUI
-internal import EventKit
 
 struct SettingsView: View {
     @EnvironmentObject var authManager: AuthenticationManager
     @EnvironmentObject var salonManager: SalonManager
-    @ObservedObject var calendarManager = CalendarManager.shared
-    @State private var showingCacheAlert = false
-    @State private var cacheAlertMessage = ""
-    @State private var isLoading = false
     @State private var showingLogoutAlert = false
-    
-    // External iCal Feed (P6 / Fase 13)
-    @State private var staffMembers: [SalonMember] = []
-    @State private var selectedStaffId: UUID? = nil
-    @State private var loadingStaff = false
-    @State private var showingCopiedAlert = false
-    @State private var showingCopiedBookingAlert = false
-    @State private var resettingCalendarToken = false
     
     var body: some View {
         Form {
-            Section("Link Prenotazioni Online") {
-                if let salon = salonManager.selectedSalon ?? salonManager.defaultSalon {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(salon.name)
-                            .font(.headline)
-                        Text(salon.bookingPath)
-                            .font(.system(.caption, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.vertical, 2)
-                    
-                    Button {
-                        let fullUrl = salon.bookingURL()
-                        #if os(iOS)
-                        UIPasteboard.general.string = fullUrl
-                        #elseif os(macOS)
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(fullUrl, forType: .string)
-                        #endif
-                        showingCopiedBookingAlert = true
-                    } label: {
-                        Label("Copia Link Prenotazione", systemImage: "link")
-                    }
-                    
-                    if let url = URL(string: salon.bookingURL()) {
-                        Link(destination: url) {
-                            Label("Apri nel Browser", systemImage: "arrow.up.right.square")
+            // MARK: - Profilo Utente
+            if let user = authManager.user {
+                Section {
+                    HStack(spacing: 16) {
+                        ZStack {
+                            Circle()
+                                .fill(LinearGradient(
+                                    colors: [Color.accentColor, Color.purple],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ))
+                                .frame(width: 52, height: 52)
+                            
+                            Text(userInitials(user: user))
+                                .font(.title3)
+                                .fontWeight(.bold)
+                                .foregroundStyle(.white)
                         }
-                    }
-                } else {
-                    Text("Nessuna sede configurata o selezionata.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .headerProminence(.increased)
-            
-            Section("Feed Calendario Esterno (Apple / Google)") {
-                if loadingStaff {
-                    HStack {
-                        ProgressView()
-                        Text("Caricamento collaboratrici...")
-                            .foregroundStyle(.secondary)
-                    }
-                } else if staffMembers.isEmpty {
-                    Text("Nessuna collaboratrice configurata per questa sede.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                } else {
-                    if staffMembers.count > 1 {
-                        Picker("Collaboratrice", selection: $selectedStaffId) {
-                            ForEach(staffMembers) { member in
-                                Text(member.displayName).tag(Optional(member.id))
-                            }
-                        }
-                    }
-                    
-                    if let member = currentSelectedMember {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Sincronizzazione Automatica")
-                                .font(.subheadline)
-                                .fontWeight(.semibold)
-                            Text("Gli appuntamenti si aggiornano da soli su Apple Calendar o Google Calendar tramite feed RFC 5545.")
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("\(user.firstName) \(user.lastName)")
+                                .font(.headline)
+                            
+                            Text(user.email)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                        }
-                        .padding(.vertical, 2)
-                        
-                        Button {
-                            subscribeAppleCalendar(member: member)
-                        } label: {
-                            Label("Sottoscrivi su Apple Calendar", systemImage: "calendar.badge.plus")
-                                .fontWeight(.medium)
-                        }
-                        
-                        Button {
-                            openGoogleCalendar(member: member)
-                        } label: {
-                            Label("Aggiungi a Google Calendar", systemImage: "arrow.up.right.square")
-                        }
-                        
-                        Button {
-                            copyFeedLink(member: member)
-                        } label: {
-                            Label("Copia Link Feed Privato", systemImage: "doc.on.doc")
-                        }
-                        
-                        Button(role: .destructive) {
-                            Task {
-                                await resetToken(member: member)
-                            }
-                        } label: {
-                            if resettingCalendarToken {
-                                ProgressView()
-                            } else {
-                                Label("Rigenera Link Privato", systemImage: "arrow.triangle.2.circlepath")
+                            
+                            HStack {
+                                Text(user.isOwner ? "TITOLARE" : "COLLABORATRICE")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(user.isOwner ? Color.purple.opacity(0.15) : Color.blue.opacity(0.15))
+                                    .foregroundStyle(user.isOwner ? Color.purple : Color.blue)
+                                    .clipShape(Capsule())
                             }
                         }
-                        .disabled(resettingCalendarToken)
                     }
+                    .padding(.vertical, 4)
                 }
             }
-            .headerProminence(.increased)
             
-            Section("Sincronizzazione Locale (EventKit)") {
-                Toggle("Abilita Sincronizzazione Locale", isOn: $calendarManager.isSyncEnabled)
-                    .onChange(of: calendarManager.isSyncEnabled) { _, newValue in
-                        if newValue {
-                            Task {
-                                let granted = await calendarManager.requestAccess()
-                                if !granted {
-                                    calendarManager.isSyncEnabled = false
-                                }
-                            }
-                        }
-                    }
+            // MARK: - Canali & Prenotazioni
+            Section("Canali e Clienti") {
+                NavigationLink(destination: BookingSettingsView()) {
+                    SettingsRow(
+                        title: "Prenotazioni Online",
+                        subtitle: "Link pubblico sede, slug e condivisione",
+                        icon: "link.circle.fill",
+                        iconColor: .purple
+                    )
+                }
+            }
+            
+            // MARK: - Calendari & Sincronizzazione
+            Section("Calendari e Sincronizzazione") {
+                NavigationLink(destination: CalendarSyncSettingsView()) {
+                    SettingsRow(
+                        title: "Feed Calendario Esterno",
+                        subtitle: "Apple Calendar, Google Calendar e iCal",
+                        icon: "calendar.badge.clock",
+                        iconColor: .blue
+                    )
+                }
                 
-                if calendarManager.isSyncEnabled {
-                    Picker("Calendario", selection: $calendarManager.selectedCalendarId) {
-                        if calendarManager.predefinedCalendars.isEmpty {
-                            Text("Nessun calendario trovato").tag("")
-                        } else {
-                            ForEach(calendarManager.predefinedCalendars, id: \.calendarIdentifier) { calendar in
-                                Text(calendar.title)
-                                    .tag(calendar.calendarIdentifier)
-                            }
-                        }
-                    }
+                NavigationLink(destination: LocalCalendarSettingsView()) {
+                    SettingsRow(
+                        title: "Calendario Locale iOS",
+                        subtitle: "Sincronizzazione EventKit su dispositivo",
+                        icon: "iphone",
+                        iconColor: .green
+                    )
                 }
             }
             
-            Section("Sistema") {
-                Button {
-                    Task {
-                        await invalidateCache()
-                    }
-                } label: {
-                    HStack {
-                        Text("Svuota Cache")
-                            .foregroundStyle(.primary)
-                        Spacer()
-                        if isLoading {
-                            ProgressView()
-                        } else {
-                            Image(systemName: "trash")
-                                .foregroundStyle(.red)
-                        }
-                    }
-                }
-                .disabled(isLoading)
-            }
-            
-            Section("Info App") {
-                HStack {
-                    Text("Versione")
-                    Spacer()
-                    Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")
-                        .foregroundStyle(.secondary)
+            // MARK: - Sistema
+            Section("Applicazione") {
+                NavigationLink(destination: SystemSettingsView()) {
+                    SettingsRow(
+                        title: "Sistema e Manutenzione",
+                        subtitle: "Svuota cache, info server e versione",
+                        icon: "gearshape.2.fill",
+                        iconColor: .secondary
+                    )
                 }
             }
             
+            // MARK: - Logout
             Section {
                 Button(role: .destructive) {
                     showingLogoutAlert = true
                 } label: {
                     HStack {
                         Spacer()
-                        Text("Esci")
+                        Label("Esci dall'Account", systemImage: "rectangle.portrait.and.arrow.right")
                             .fontWeight(.semibold)
                         Spacer()
                     }
@@ -196,103 +110,51 @@ struct SettingsView: View {
         }
         .navigationTitle("Impostazioni")
         .inlineNavigationTitle()
-        .alert("Cache", isPresented: $showingCacheAlert) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text(cacheAlertMessage)
-        }
-        .alert("Link Copiato!", isPresented: $showingCopiedAlert) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text("Il link del feed iCalendar (.ics) è stato copiato negli appunti. Puoi incollarlo in Outlook o in qualsiasi altra applicazione di calendario.")
-        }
-        .alert("Link Prenotazione Copiato!", isPresented: $showingCopiedBookingAlert) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text("Il link per la prenotazione online è stato copiato negli appunti. Puoi condividerlo con le clienti.")
-        }
         .alert("Conferma Logout", isPresented: $showingLogoutAlert) {
             Button("Annulla", role: .cancel) { }
             Button("Esci", role: .destructive) {
                 authManager.logout()
             }
         } message: {
-            Text("Vuoi davvero uscire dall'app?")
-        }
-        .onAppear {
-            if calendarManager.isSyncEnabled {
-                Task { let _ = await calendarManager.requestAccess() }
-            }
-        }
-        .task {
-            await loadStaff()
+            Text("Vuoi davvero uscire dall'app? Dovrai effettuare nuovamente l'accesso.")
         }
     }
     
-    private var currentSelectedMember: SalonMember? {
-        if let id = selectedStaffId {
-            return staffMembers.first(where: { $0.id == id })
-        }
-        return staffMembers.first
+    private func userInitials(user: User) -> String {
+        let first = user.firstName.prefix(1).uppercased()
+        let last = user.lastName.prefix(1).uppercased()
+        return "\(first)\(last)"
     }
-    
-    private func subscribeAppleCalendar(member: SalonMember) {
-        if let url = member.calendarWebcalURL(baseURL: APIClient.baseServerURL) {
-            UIApplication.shared.open(url)
-        }
-    }
-    
-    private func openGoogleCalendar(member: SalonMember) {
-        if let url = member.googleCalendarSubscribeURL(baseURL: APIClient.baseServerURL) {
-            UIApplication.shared.open(url)
-        }
-    }
-    
-    private func copyFeedLink(member: SalonMember) {
-        if let url = member.calendarFeedURL(baseURL: APIClient.baseServerURL)?.absoluteString {
-            UIPasteboard.general.string = url
-            showingCopiedAlert = true
-        }
-    }
+}
 
-    private func resetToken(member: SalonMember) async {
-        guard let salonId = salonManager.selectedSalonId ?? staffMembers.first?.salonId else { return }
-        resettingCalendarToken = true
-        do {
-            let updated = try await APIClient.shared.resetCalendarToken(salonId: salonId, memberId: member.id)
-            if let idx = staffMembers.firstIndex(where: { $0.id == updated.id }) {
-                staffMembers[idx] = updated
-            }
-        } catch {
-            print("Failed to reset token: \(error)")
-        }
-        resettingCalendarToken = false
-    }
-
-    private func loadStaff() async {
-        guard let salonId = salonManager.selectedSalonId ?? salonManager.defaultSalon?.id else { return }
-        loadingStaff = true
-        do {
-            staffMembers = try await APIClient.shared.getSalonStaff(salonId: salonId)
-            if selectedStaffId == nil {
-                selectedStaffId = staffMembers.first?.id
-            }
-        } catch {
-            print("Failed to load staff: \(error)")
-        }
-        loadingStaff = false
-    }
+// MARK: - SettingsRow Component
+private struct SettingsRow: View {
+    let title: String
+    let subtitle: String
+    let icon: String
+    let iconColor: Color
     
-    private func invalidateCache() async {
-        isLoading = true
-        do {
-            try await APIClient.shared.invalidateCache()
-            cacheAlertMessage = "La cache è stata svuotata con successo."
-        } catch {
-            cacheAlertMessage = "Errore durante lo svuotamento della cache: \(error.localizedDescription)"
+    var body: some View {
+        HStack(spacing: 14) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(iconColor.opacity(0.12))
+                    .frame(width: 36, height: 36)
+                Image(systemName: icon)
+                    .font(.body)
+                    .foregroundStyle(iconColor)
+            }
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.body)
+                    .fontWeight(.medium)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
-        isLoading = false
-        showingCacheAlert = true
+        .padding(.vertical, 4)
     }
 }
 

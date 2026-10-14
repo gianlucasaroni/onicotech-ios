@@ -17,167 +17,133 @@ struct SalonListView: View {
                 ContentUnavailableView(
                     "Nessuna sede configurata",
                     systemImage: "building.2",
-                    description: Text("Aggiungi la tua prima sede/salone toccando +")
+                    description: Text("Aggiungi la tua prima sede o salone toccando +")
                 )
             } else {
                 List {
                     ForEach(viewModel.salons) { salon in
-                        Section {
-                            VStack(alignment: .leading, spacing: 10) {
-                                HStack(alignment: .top) {
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        HStack(spacing: 6) {
-                                            Text(salon.name)
-                                                .font(.headline)
-                                            
-                                            if salon.isDefault {
-                                                Text("PREDEFINITA")
-                                                    .font(.system(size: 10, weight: .bold))
-                                                    .padding(.horizontal, 6)
-                                                    .padding(.vertical, 2)
-                                                    .background(Color.yellow.opacity(0.2))
-                                                    .foregroundStyle(.orange)
-                                                    .clipShape(Capsule())
-                                            }
-                                            
-                                            if !salon.active {
-                                                Text("INATTIVA")
-                                                    .font(.system(size: 10, weight: .bold))
-                                                    .padding(.horizontal, 6)
-                                                    .padding(.vertical, 2)
-                                                    .background(Color.secondary.opacity(0.2))
-                                                    .foregroundStyle(.secondary)
-                                                    .clipShape(Capsule())
-                                            }
+                        NavigationLink(destination: SalonDetailView(viewModel: viewModel, salonId: salon.id, initialSalon: salon)) {
+                            HStack(spacing: 14) {
+                                ZStack {
+                                    Circle()
+                                        .fill(salon.isDefault ? Color.orange.opacity(0.15) : Color.accentColor.opacity(0.12))
+                                        .frame(width: 44, height: 44)
+                                    Image(systemName: "building.2.fill")
+                                        .foregroundStyle(salon.isDefault ? Color.orange : Color.accentColor)
+                                        .font(.body)
+                                }
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    HStack(spacing: 6) {
+                                        Text(salon.name)
+                                            .font(.headline)
+                                        
+                                        if salon.isDefault {
+                                            Text("PREDEFINITA")
+                                                .font(.system(size: 9, weight: .bold))
+                                                .padding(.horizontal, 6)
+                                                .padding(.vertical, 2)
+                                                .background(Color.yellow.opacity(0.2))
+                                                .foregroundStyle(.orange)
+                                                .clipShape(Capsule())
                                         }
                                         
-                                        if !salon.fullAddress.isEmpty {
-                                            Label(salon.fullAddress, systemImage: "mappin.circle.fill")
-                                                .font(.subheadline)
+                                        if !salon.active {
+                                            Text("INATTIVA")
+                                                .font(.system(size: 9, weight: .bold))
+                                                .padding(.horizontal, 6)
+                                                .padding(.vertical, 2)
+                                                .background(Color.secondary.opacity(0.2))
                                                 .foregroundStyle(.secondary)
+                                                .clipShape(Capsule())
                                         }
                                     }
                                     
-                                    Spacer()
+                                    if !salon.fullAddress.isEmpty {
+                                        Text(salon.fullAddress)
+                                            .font(.subheadline)
+                                            .foregroundStyle(.secondary)
+                                            .lineLimit(1)
+                                    } else if let city = salon.city, !city.isEmpty {
+                                        Text(city)
+                                            .font(.subheadline)
+                                            .foregroundStyle(.secondary)
+                                    }
                                     
-                                    Menu {
-                                        Button {
-                                            salonToEdit = salon
-                                        } label: {
-                                            Label("Modifica", systemImage: "pencil")
-                                        }
-                                        
-                                        Button {
-                                            copyBookingLink(for: salon)
-                                        } label: {
-                                            Label("Copia Link Prenotazione", systemImage: "link")
-                                        }
-                                        
-                                        if !salon.isDefault {
-                                            Button {
-                                                Task {
-                                                    if await viewModel.setDefaultSalon(id: salon.id) {
-                                                        await salonManager.loadSalons()
-                                                    }
-                                                }
-                                            } label: {
-                                                Label("Imposta come Predefinita", systemImage: "star")
-                                            }
-                                        }
-                                        
-                                        Divider()
-                                        
-                                        Button(role: .destructive) {
-                                            salonToDelete = salon
-                                            showingDeleteAlert = true
-                                        } label: {
-                                            Label("Elimina", systemImage: "trash")
-                                        }
-                                    } label: {
-                                        Image(systemName: "ellipsis.circle")
-                                            .font(.title3)
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "link")
+                                            .font(.system(size: 10))
+                                            .foregroundStyle(.secondary)
+                                        Text(salon.bookingPath)
+                                            .font(.system(size: 11, design: .monospaced))
                                             .foregroundStyle(.secondary)
                                     }
                                 }
-                                
-                                if let phone = salon.phone, !phone.isEmpty {
-                                    Label(phone, systemImage: "phone")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                
-                                // Booking link banner
-                                HStack(spacing: 8) {
-                                    Image(systemName: "link")
-                                        .font(.caption)
-                                        .foregroundStyle(Color.accentColor)
-                                    
-                                    Text(salon.bookingPath)
-                                        .font(.system(.caption, design: .monospaced))
-                                        .foregroundStyle(.secondary)
-                                        .lineLimit(1)
-                                    
-                                    Spacer()
-                                    
-                                    Button {
-                                        copyBookingLink(for: salon)
-                                    } label: {
-                                        HStack(spacing: 4) {
-                                            Image(systemName: copiedSalonId == salon.id ? "checkmark" : "doc.on.doc")
-                                            Text(copiedSalonId == salon.id ? "Copiato" : "Copia link")
-                                        }
-                                        .font(.caption2)
-                                        .fontWeight(.medium)
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 4)
-                                        .background(Color.accentColor.opacity(0.12))
-                                        .foregroundStyle(Color.accentColor)
-                                        .clipShape(Capsule())
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 6)
-                                .background(Color.secondary.opacity(0.08))
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                                
-                                Divider()
-                                    .padding(.vertical, 2)
-                                
-                                // Management navigation buttons
-                                HStack(spacing: 12) {
-                                    NavigationLink(destination: SalonServicesView(salon: salon)) {
-                                        HStack(spacing: 6) {
-                                            Image(systemName: "scissors")
-                                            Text("Listino e Prezzi")
-                                                .font(.caption)
-                                                .fontWeight(.medium)
-                                        }
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 8)
-                                        .background(Color.accentColor.opacity(0.1))
-                                        .foregroundStyle(Color.accentColor)
-                                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                                    }
-                                    .buttonStyle(.plain)
-                                    
-                                    NavigationLink(destination: SalonHoursView(salon: salon)) {
-                                        HStack(spacing: 6) {
-                                            Image(systemName: "clock")
-                                            Text("Orari Apertura")
-                                                .font(.caption)
-                                                .fontWeight(.medium)
-                                        }
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 8)
-                                        .background(Color.blue.opacity(0.1))
-                                        .foregroundStyle(.blue)
-                                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                                    }
-                                    .buttonStyle(.plain)
-                                }
                             }
                             .padding(.vertical, 4)
+                        }
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button(role: .destructive) {
+                                salonToDelete = salon
+                                showingDeleteAlert = true
+                            } label: {
+                                Label("Elimina", systemImage: "trash")
+                            }
+                            
+                            Button {
+                                salonToEdit = salon
+                            } label: {
+                                Label("Modifica", systemImage: "pencil")
+                            }
+                            .tint(.blue)
+                        }
+                        .swipeActions(edge: .leading) {
+                            if !salon.isDefault {
+                                Button {
+                                    Task {
+                                        if await viewModel.setDefaultSalon(id: salon.id) {
+                                            await salonManager.loadSalons()
+                                        }
+                                    }
+                                } label: {
+                                    Label("Predefinita", systemImage: "star")
+                                }
+                                .tint(.orange)
+                            }
+                        }
+                        .contextMenu {
+                            Button {
+                                salonToEdit = salon
+                            } label: {
+                                Label("Modifica Sede", systemImage: "pencil")
+                            }
+                            
+                            Button {
+                                copyBookingLink(for: salon)
+                            } label: {
+                                Label("Copia Link Prenotazione", systemImage: "doc.on.doc")
+                            }
+                            
+                            if !salon.isDefault {
+                                Button {
+                                    Task {
+                                        if await viewModel.setDefaultSalon(id: salon.id) {
+                                            await salonManager.loadSalons()
+                                        }
+                                    }
+                                } label: {
+                                    Label("Imposta come Predefinita", systemImage: "star")
+                                }
+                            }
+                            
+                            Divider()
+                            
+                            Button(role: .destructive) {
+                                salonToDelete = salon
+                                showingDeleteAlert = true
+                            } label: {
+                                Label("Elimina Sede", systemImage: "trash")
+                            }
                         }
                     }
                 }
