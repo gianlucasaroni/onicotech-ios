@@ -65,6 +65,18 @@ final class APIClient {
     static let baseServerURL = "http://192.168.1.14:8282/api/v1"
     //static let baseServerURL = "http://be-onicotech.casaperoni/api/v1"
     
+    static var baseWebURL: String {
+        if let url = URL(string: baseServerURL), let host = url.host {
+            let scheme = url.scheme ?? "http"
+            if host.contains("casaperoni") {
+                return "\(scheme)://onicotech.casaperoni"
+            } else if host == "127.0.0.1" || host.starts(with: "192.168.") || host == "localhost" {
+                return "\(scheme)://\(host):4200"
+            }
+        }
+        return "https://onicotech.it"
+    }
+    
     private var isRefreshing = false
     
     private let decoder: JSONDecoder = {
@@ -357,6 +369,16 @@ final class APIClient {
     
     func setDefaultSalon(id: UUID) async throws {
         let _: APIResponse<[String: String]> = try await request(path: "/salons/\(id)/default", method: "POST")
+    }
+    
+    func checkSlugAvailability(slug: String, excludeId: UUID? = nil) async throws -> (available: Bool, cleanSlug: String) {
+        var queryItems = [URLQueryItem(name: "slug", value: slug)]
+        if let excludeId {
+            queryItems.append(URLQueryItem(name: "excludeId", value: excludeId.uuidString))
+        }
+        let response: APIResponse<SlugCheckResult> = try await request(path: "/salons/check-slug", queryItems: queryItems)
+        guard let data = response.data else { throw APIError.invalidResponse }
+        return (data.available, data.slug)
     }
     
     func getSalonServices(salonId: UUID) async throws -> [SalonServiceItem] {

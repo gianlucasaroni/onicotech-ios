@@ -15,10 +15,48 @@ struct SettingsView: View {
     @State private var selectedStaffId: UUID? = nil
     @State private var loadingStaff = false
     @State private var showingCopiedAlert = false
+    @State private var showingCopiedBookingAlert = false
     @State private var resettingCalendarToken = false
     
     var body: some View {
         Form {
+            Section("Link Prenotazioni Online") {
+                if let salon = salonManager.selectedSalon ?? salonManager.defaultSalon {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(salon.name)
+                            .font(.headline)
+                        Text(salon.bookingPath)
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 2)
+                    
+                    Button {
+                        let fullUrl = salon.bookingURL()
+                        #if os(iOS)
+                        UIPasteboard.general.string = fullUrl
+                        #elseif os(macOS)
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(fullUrl, forType: .string)
+                        #endif
+                        showingCopiedBookingAlert = true
+                    } label: {
+                        Label("Copia Link Prenotazione", systemImage: "link")
+                    }
+                    
+                    if let url = URL(string: salon.bookingURL()) {
+                        Link(destination: url) {
+                            Label("Apri nel Browser", systemImage: "arrow.up.right.square")
+                        }
+                    }
+                } else {
+                    Text("Nessuna sede configurata o selezionata.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .headerProminence(.increased)
+            
             Section("Feed Calendario Esterno (Apple / Google)") {
                 if loadingStaff {
                     HStack {
@@ -167,6 +205,11 @@ struct SettingsView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text("Il link del feed iCalendar (.ics) è stato copiato negli appunti. Puoi incollarlo in Outlook o in qualsiasi altra applicazione di calendario.")
+        }
+        .alert("Link Prenotazione Copiato!", isPresented: $showingCopiedBookingAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("Il link per la prenotazione online è stato copiato negli appunti. Puoi condividerlo con le clienti.")
         }
         .alert("Conferma Logout", isPresented: $showingLogoutAlert) {
             Button("Annulla", role: .cancel) { }

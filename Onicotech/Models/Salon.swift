@@ -3,6 +3,7 @@ import Foundation
 struct Salon: Codable, Identifiable, Hashable, Equatable {
     var id: UUID
     var name: String
+    var slug: String?
     var address: String?
     var city: String?
     var postalCode: String?
@@ -21,10 +22,27 @@ struct Salon: Codable, Identifiable, Hashable, Equatable {
         if let postalCode, !postalCode.isEmpty { parts.append(postalCode) }
         return parts.joined(separator: ", ")
     }
+    
+    var bookingPath: String {
+        let key: String
+        if let slug, !slug.trimmingCharacters(in: .whitespaces).isEmpty {
+            key = slug
+        } else {
+            key = id.uuidString
+        }
+        return "/s/\(key)/book"
+    }
+    
+    func bookingURL(baseURL: String? = nil) -> String {
+        let base = baseURL ?? APIClient.baseWebURL
+        let cleanBase = base.hasSuffix("/") ? String(base.dropLast()) : base
+        return "\(cleanBase)\(bookingPath)"
+    }
 }
 
 struct CreateSalonRequest: Codable {
     var name: String
+    var slug: String?
     var address: String?
     var city: String?
     var postalCode: String?
@@ -36,6 +54,7 @@ struct CreateSalonRequest: Codable {
 
 struct UpdateSalonRequest: Codable {
     var name: String
+    var slug: String?
     var address: String?
     var city: String?
     var postalCode: String?
@@ -102,4 +121,9 @@ struct BusinessHourItem: Codable, Identifiable {
 
 struct UpdateBusinessHoursRequest: Codable {
     var hours: [BusinessHourItem]
+}
+
+struct SlugCheckResult: Codable {
+    let available: Bool
+    let slug: String
 }

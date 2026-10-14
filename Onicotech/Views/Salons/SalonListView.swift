@@ -7,6 +7,7 @@ struct SalonListView: View {
     @State private var salonToEdit: Salon?
     @State private var salonToDelete: Salon?
     @State private var showingDeleteAlert = false
+    @State private var copiedSalonId: UUID? = nil
     
     var body: some View {
         Group {
@@ -66,6 +67,12 @@ struct SalonListView: View {
                                             Label("Modifica", systemImage: "pencil")
                                         }
                                         
+                                        Button {
+                                            copyBookingLink(for: salon)
+                                        } label: {
+                                            Label("Copia Link Prenotazione", systemImage: "link")
+                                        }
+                                        
                                         if !salon.isDefault {
                                             Button {
                                                 Task {
@@ -98,6 +105,41 @@ struct SalonListView: View {
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }
+                                
+                                // Booking link banner
+                                HStack(spacing: 8) {
+                                    Image(systemName: "link")
+                                        .font(.caption)
+                                        .foregroundStyle(Color.accentColor)
+                                    
+                                    Text(salon.bookingPath)
+                                        .font(.system(.caption, design: .monospaced))
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                    
+                                    Spacer()
+                                    
+                                    Button {
+                                        copyBookingLink(for: salon)
+                                    } label: {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: copiedSalonId == salon.id ? "checkmark" : "doc.on.doc")
+                                            Text(copiedSalonId == salon.id ? "Copiato" : "Copia link")
+                                        }
+                                        .font(.caption2)
+                                        .fontWeight(.medium)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(Color.accentColor.opacity(0.12))
+                                        .foregroundStyle(Color.accentColor)
+                                        .clipShape(Capsule())
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 6)
+                                .background(Color.secondary.opacity(0.08))
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
                                 
                                 Divider()
                                     .padding(.vertical, 2)
@@ -185,6 +227,24 @@ struct SalonListView: View {
         .refreshable {
             await viewModel.loadSalons()
             await salonManager.loadSalons()
+        }
+    }
+    
+    private func copyBookingLink(for salon: Salon) {
+        let fullUrl = salon.bookingURL()
+        #if os(iOS)
+        UIPasteboard.general.string = fullUrl
+        #elseif os(macOS)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(fullUrl, forType: .string)
+        #endif
+        
+        copiedSalonId = salon.id
+        Task {
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            if copiedSalonId == salon.id {
+                copiedSalonId = nil
+            }
         }
     }
 }
