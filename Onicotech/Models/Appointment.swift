@@ -68,6 +68,16 @@ struct Appointment: Codable, Identifiable {
         let value = Double(totalPrice ?? 0) / 100.0
         return String(format: "€%.2f", value)
     }
+
+    var formattedDiscountAmount: String {
+        let value = Double(discountAmount ?? 0) / 100.0
+        return String(format: "-€%.2f", value)
+    }
+
+    var formattedFinalPrice: String {
+        let value = Double(finalPrice ?? totalPrice ?? 0) / 100.0
+        return String(format: "€%.2f", value)
+    }
     
     var timeRange: String {
         if let end = endTime {

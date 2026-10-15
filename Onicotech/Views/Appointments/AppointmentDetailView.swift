@@ -276,11 +276,32 @@ struct AppointmentDetailView: View {
                     }
                     
                     HStack {
-                        Text("Totale Trattamenti")
+                        Text(appointment.discountAmount != nil && appointment.discountAmount! > 0 ? "Totale Servizi" : "Totale Trattamenti")
                             .fontWeight(.semibold)
                         Spacer()
                         Text(appointment.formattedTotalPrice)
                             .fontWeight(.semibold)
+                            .strikethrough(appointment.discountAmount != nil && appointment.discountAmount! > 0)
+                    }
+
+                    if let discount = appointment.discountAmount, discount > 0 {
+                        HStack {
+                            Text(appointment.promotion?.name != nil ? "Sconto (\(appointment.promotion!.name))" : "Sconto Applicato")
+                                .foregroundStyle(.green)
+                            Spacer()
+                            Text(appointment.formattedDiscountAmount)
+                                .fontWeight(.medium)
+                                .foregroundStyle(.green)
+                        }
+
+                        HStack {
+                            Text("Totale da Saldare")
+                                .fontWeight(.bold)
+                            Spacer()
+                            Text(appointment.formattedFinalPrice)
+                                .fontWeight(.bold)
+                                .foregroundStyle(.blue)
+                        }
                     }
                 }
             }

@@ -14,6 +14,7 @@ struct AppointmentFormView: View {
     @State private var startTime = Date()
     @State private var selectedClientId: UUID?
     @State private var selectedSalonId: UUID?
+    @State private var selectedStaffMemberId: UUID?
     @State private var selectedServiceIds: Set<UUID> = []
     @State private var notes = ""
     @State private var status: AppointmentStatus = .scheduled
@@ -23,6 +24,7 @@ struct AppointmentFormView: View {
     @State private var clients: [Client] = []
     @State private var services: [Service] = []
     @State private var promotions: [Promotion] = []
+    @State private var staffMembers: [SalonMember] = []
     @State private var selectedPromotionId: UUID?
     @State private var isLoadingData = true
     
@@ -63,6 +65,17 @@ struct AppointmentFormView: View {
                                     Text("Predefinita / Non specificata").tag(nil as UUID?)
                                     ForEach(salonManager.salons) { salon in
                                         Text(salon.name + (salon.isDefault ? " (Predefinita)" : "")).tag(salon.id as UUID?)
+                                    }
+                                }
+                            }
+                        }
+                        
+                        if !staffMembers.isEmpty {
+                            Section("Operatrice") {
+                                Picker("Assegna a", selection: $selectedStaffMemberId) {
+                                    Text("Nessuna / Salone").tag(nil as UUID?)
+                                    ForEach(staffMembers.filter { $0.active && $0.isPractitioner }) { staff in
+                                        Text(staff.displayName).tag(staff.id as UUID?)
                                     }
                                 }
                             }
@@ -199,6 +212,18 @@ struct AppointmentFormView: View {
                     .onChange(of: selectedClientId) { _, newValue in
                         onClientChange(newClientId: newValue)
                     }
+                    .onChange(of: selectedSalonId) { _, newSalonId in
+                        Task {
+                            if let newSalonId {
+                                staffMembers = (try? await APIClient.shared.getSalonStaff(salonId: newSalonId)) ?? []
+                            } else {
+                                staffMembers = []
+                            }
+                            if let staffId = selectedStaffMemberId, !staffMembers.contains(where: { $0.id == staffId }) {
+                                selectedStaffMemberId = nil
+                            }
+                        }
+                    }
                 }
             }
             .navigationTitle(isEditing ? "Modifica Appuntamento" : "Nuovo Appuntamento")
@@ -251,6 +276,7 @@ struct AppointmentFormView: View {
             if let t = timeF.date(from: appointment.startTime) { startTime = t }
             selectedClientId = appointment.clientId
             selectedSalonId = appointment.salonId
+            selectedStaffMemberId = appointment.staffMemberId ?? appointment.staffMember?.id
             if let svcIds = appointment.services?.compactMap(\.id) {
                 selectedServiceIds = Set(svcIds)
             }
@@ -259,6 +285,7 @@ struct AppointmentFormView: View {
             selectedPromotionId = appointment.promotionId
         } else {
             selectedSalonId = salonManager.selectedSalonId ?? salonManager.defaultSalon?.id
+            selectedStaffMemberId = nil
             // Apply preselections for new appointments
             if let preselectedClientId {
                 selectedClientId = preselectedClientId
@@ -275,6 +302,10 @@ struct AppointmentFormView: View {
             if let preselectedDate {
                 date = preselectedDate
             }
+        }
+        
+        if let salonId = appointment?.salonId ?? selectedSalonId {
+            staffMembers = (try? await APIClient.shared.getSalonStaff(salonId: salonId)) ?? []
         }
         
         isLoadingData = false
@@ -314,6 +345,7 @@ struct AppointmentFormView: View {
                 startTime: timeStr,
                 clientId: clientId,
                 salonId: selectedSalonId,
+                staffMemberId: selectedStaffMemberId,
                 serviceIds: serviceIdArray,
                 notes: notes.isEmpty ? nil : notes,
                 promotionId: selectedPromotionId,
@@ -326,6 +358,7 @@ struct AppointmentFormView: View {
                 startTime: timeStr,
                 clientId: clientId,
                 salonId: selectedSalonId,
+                staffMemberId: selectedStaffMemberId,
                 serviceIds: serviceIdArray,
                 notes: notes.isEmpty ? nil : notes,
                 promotionId: selectedPromotionId
