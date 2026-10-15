@@ -14,11 +14,27 @@ struct AppointmentDetailView: View {
     @EnvironmentObject var salonManager: SalonManager
     @Environment(\.dismiss) private var dismiss
     
+    @State private var detailedAppointment: Appointment?
+    @State private var salonStaff: [SalonMember] = []
+    
     private var appointment: Appointment {
+        if let detailed = detailedAppointment {
+            return detailed
+        }
         if let live = viewModel.appointments.first(where: { $0.id == appointmentId }) {
             return live
         }
         return initialAppointment
+    }
+    
+    private var assignedStaffMember: SalonMember? {
+        if let staff = appointment.staffMember {
+            return staff
+        }
+        if let staffId = appointment.staffMemberId {
+            return salonStaff.first(where: { $0.id == staffId })
+        }
+        return nil
     }
     
     var statusColor: Color {
@@ -63,12 +79,22 @@ struct AppointmentDetailView: View {
                     }
                 }
                 
-                if let staff = appointment.staffMember {
-                    HStack {
-                        Label("Operatrice", systemImage: "person.badge.shield.checkmark")
-                        Spacer()
-                        Text(staff.displayName)
-                            .fontWeight(.medium)
+                HStack {
+                    Label("Operatrice", systemImage: "person.badge.shield.checkmark")
+                    Spacer()
+                    if let staff = assignedStaffMember {
+                        HStack(spacing: 6) {
+                            if let color = staff.color, !color.isEmpty {
+                                Circle()
+                                    .fill(Color(hex: color))
+                                    .frame(width: 8, height: 8)
+                            }
+                            Text(staff.displayName)
+                                .fontWeight(.medium)
+                        }
+                    } else {
+                        Text("Non assegnata")
+                            .foregroundStyle(.secondary)
                     }
                 }
                 
@@ -239,7 +265,7 @@ struct AppointmentDetailView: View {
                         }
                         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                         
-                        if let staff = appointment.staffMember {
+                        if let staff = assignedStaffMember {
                             Link(destination: staffWhatsappURL(staff: staff)) {
                                 Label("Invia Scheda ad Operatrice (\(staff.displayName))", systemImage: "arrowshape.turn.up.right.fill")
                                     .font(.subheadline)
@@ -391,7 +417,49 @@ struct AppointmentDetailView: View {
         }
         #endif
         .task {
+            await loadAppointmentDetail()
+            await loadStaffIfNeeded()
             await loadPhotos()
+        }
+        .refreshable {
+            await loadAppointmentDetail()
+            await loadStaffIfNeeded()
+            await loadPhotos()
+        }
+        .onChange(of: showEditSheet) {
+            if !showEditSheet {
+                Task {
+                    await loadAppointmentDetail()
+                    await loadStaffIfNeeded()
+                }
+            }
+        }
+    }
+    
+    private func loadAppointmentDetail() async {
+        do {
+            let fetched = try await APIClient.shared.getAppointment(id: appointmentId)
+            await MainActor.run {
+                detailedAppointment = fetched
+            }
+            if fetched.staffMember == nil && fetched.staffMemberId != nil {
+                await loadStaffIfNeeded(salonId: fetched.salonId ?? appointment.salonId)
+            }
+        } catch {
+            print("Error loading appointment detail: \(error)")
+        }
+    }
+    
+    private func loadStaffIfNeeded(salonId: UUID? = nil) async {
+        let targetSalonId = salonId ?? appointment.salonId ?? salonManager.selectedSalonId
+        guard let targetSalonId else { return }
+        do {
+            let members = try await APIClient.shared.getSalonStaff(salonId: targetSalonId)
+            await MainActor.run {
+                salonStaff = members
+            }
+        } catch {
+            print("Error loading salon staff: \(error)")
         }
     }
     
@@ -465,11 +533,11 @@ struct AppointmentDetailView: View {
         let location = (salon?.fullAddress.isEmpty == false) ? "\(salonName) (\(salon!.fullAddress))" : salonName
         
         let isStaffSender = salonManager.activeRole == "staff"
-        let assignedStaffName = appointment.staffMember?.displayName
+        let assignedStaffName = assignedStaffMember?.displayName
         
         var msg = ""
         if isStaffSender {
-            let staffName = appointment.staffMember?.displayName ?? "la tua operatrice"
+            let staffName = assignedStaffName ?? "la tua operatrice"
             msg = "Ciao \(clientName)! ✨\nSono \(staffName) di \(salonName).\nTi ricordo il tuo appuntamento per \(formattedDate) alle ore \(appointment.startTime).\n\n"
         } else if let staffName = assignedStaffName {
             msg = "Ciao \(clientName)! ✨\nTi ricordiamo il tuo appuntamento con la nostra operatrice \(staffName) presso \(salonName):\n\n📅 Data: \(formattedDate)\n⏰ Orario: ore \(appointment.startTime)\n"
@@ -488,7 +556,7 @@ struct AppointmentDetailView: View {
         }
         
         if isStaffSender {
-            let staffName = appointment.staffMember?.displayName ?? ""
+            let staffName = assignedStaffMember?.displayName ?? ""
             msg += "\nA presto, \(staffName)! 💅✨"
         } else {
             msg += "\nIl team di \(salonName) 💅✨"

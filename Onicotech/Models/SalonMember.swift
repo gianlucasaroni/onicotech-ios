@@ -53,6 +53,26 @@ public struct SalonMember: Codable, Identifiable, Hashable {
         self.calendarWebcalUrl = calendarWebcalUrl
         self.createdAt = createdAt
     }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(UUID.self, forKey: .id)
+        self.salonId = try container.decodeIfPresent(UUID.self, forKey: .salonId) ?? UUID()
+        self.userId = try container.decodeIfPresent(UUID.self, forKey: .userId)
+        self.role = try container.decodeIfPresent(String.self, forKey: .role) ?? "staff"
+        self.isPractitioner = try container.decodeIfPresent(Bool.self, forKey: .isPractitioner) ?? true
+        self.displayName = try container.decodeIfPresent(String.self, forKey: .displayName) ?? ""
+        self.color = try container.decodeIfPresent(String.self, forKey: .color)
+        self.active = try container.decodeIfPresent(Bool.self, forKey: .active) ?? true
+        self.canViewAllClients = try container.decodeIfPresent(Bool.self, forKey: .canViewAllClients)
+        self.maskClientPhone = try container.decodeIfPresent(Bool.self, forKey: .maskClientPhone)
+        self.serviceCommissionRate = try container.decodeIfPresent(Int.self, forKey: .serviceCommissionRate)
+        self.productCommissionRate = try container.decodeIfPresent(Int.self, forKey: .productCommissionRate)
+        self.calendarFeedToken = try container.decodeIfPresent(String.self, forKey: .calendarFeedToken)
+        self.calendarFeedUrl = try container.decodeIfPresent(String.self, forKey: .calendarFeedUrl)
+        self.calendarWebcalUrl = try container.decodeIfPresent(String.self, forKey: .calendarWebcalUrl)
+        self.createdAt = try? container.decodeIfPresent(Date.self, forKey: .createdAt)
+    }
     
     public var isOwner: Bool {
         role == "owner"
