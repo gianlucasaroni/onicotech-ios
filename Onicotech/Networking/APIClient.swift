@@ -115,34 +115,57 @@ final class APIClient {
     
     // MARK: - Token Refresh
     
-    private func refreshAccessToken() async throws {
-        guard let refreshToken = UserDefaults.standard.string(forKey: StorageKeys.refreshToken) else {
-            throw APIError.sessionExpired
+    private var refreshTask: Task<Void, Error>?
+    
+    func refreshAccessToken() async throws {
+        if let existing = refreshTask {
+            try await existing.value
+            return
         }
         
-        guard let url = URL(string: "\(APIClient.baseServerURL)/auth/refresh") else {
-            throw APIError.invalidURL
+        let task = Task { () throws in
+            defer { self.refreshTask = nil }
+            
+            guard let refreshToken = UserDefaults.standard.string(forKey: StorageKeys.refreshToken) else {
+                throw APIError.sessionExpired
+            }
+            
+            guard let url = URL(string: "\(APIClient.baseServerURL)/auth/refresh") else {
+                throw APIError.invalidURL
+            }
+            
+            var urlRequest = URLRequest(url: url)
+            urlRequest.httpMethod = "POST"
+            urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            
+            var body: [String: Any] = [
+                "refreshToken": refreshToken
+            ]
+            if let salonId = UserDefaults.standard.string(forKey: "selectedSalonId"), salonId != "all" {
+                body["activeSalonId"] = salonId
+                urlRequest.setValue(salonId, forHTTPHeaderField: "X-Salon-Id")
+            }
+            
+            urlRequest.httpBody = try JSONSerialization.data(withJSONObject: body)
+            
+            let (data, response) = try await URLSession.shared.data(for: urlRequest)
+            
+            guard let httpResponse = response as? HTTPURLResponse,
+                  (200...299).contains(httpResponse.statusCode) else {
+                // Refresh failed — clear tokens and notify
+                UserDefaults.standard.removeObject(forKey: StorageKeys.authToken)
+                UserDefaults.standard.removeObject(forKey: StorageKeys.refreshToken)
+                NotificationCenter.default.post(name: .sessionExpired, object: nil)
+                throw APIError.sessionExpired
+            }
+            
+            let refreshResponse = try decoder.decode(RefreshResponse.self, from: data)
+            UserDefaults.standard.set(refreshResponse.token, forKey: StorageKeys.authToken)
+            UserDefaults.standard.set(refreshResponse.refreshToken, forKey: StorageKeys.refreshToken)
         }
         
-        var urlRequest = URLRequest(url: url)
-        urlRequest.httpMethod = "POST"
-        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        urlRequest.httpBody = try encoder.encode([StorageKeys.refreshToken: refreshToken])
-        
-        let (data, response) = try await URLSession.shared.data(for: urlRequest)
-        
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
-            // Refresh failed — clear tokens and notify
-            UserDefaults.standard.removeObject(forKey: StorageKeys.authToken)
-            UserDefaults.standard.removeObject(forKey: StorageKeys.refreshToken)
-            NotificationCenter.default.post(name: .sessionExpired, object: nil)
-            throw APIError.sessionExpired
-        }
-        
-        let refreshResponse = try decoder.decode(RefreshResponse.self, from: data)
-        UserDefaults.standard.set(refreshResponse.token, forKey: StorageKeys.authToken)
-        UserDefaults.standard.set(refreshResponse.refreshToken, forKey: StorageKeys.refreshToken)
+        self.refreshTask = task
+        try await task.value
     }
     
     // MARK: - Generic Request
@@ -183,6 +206,11 @@ final class APIClient {
         // Add Auth Token
         if let token = UserDefaults.standard.string(forKey: StorageKeys.authToken) {
             urlRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        
+        // Add Salon ID context
+        if let salonId = UserDefaults.standard.string(forKey: "selectedSalonId"), salonId != "all" {
+            urlRequest.setValue(salonId, forHTTPHeaderField: "X-Salon-Id")
         }
         
         if let body {
@@ -242,6 +270,11 @@ final class APIClient {
         // Add Auth Token
         if let token = UserDefaults.standard.string(forKey: StorageKeys.authToken) {
             urlRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        
+        // Add Salon ID context
+        if let salonId = UserDefaults.standard.string(forKey: "selectedSalonId"), salonId != "all" {
+            urlRequest.setValue(salonId, forHTTPHeaderField: "X-Salon-Id")
         }
         
         let (data, response): (Data, URLResponse)

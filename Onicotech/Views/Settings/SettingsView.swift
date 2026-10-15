@@ -94,6 +94,26 @@ struct SettingsView: View {
                 }
             }
             
+            // MARK: - Sicurezza
+            if authManager.hasBiometricHardware {
+                Section("Accesso e Sicurezza") {
+                    HStack {
+                        Label("Accesso rapido con \(authManager.biometricsName)", systemImage: authManager.biometricsIconName)
+                        Spacer()
+                        if authManager.hasBiometricsSaved {
+                            Text("Abilitato")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .foregroundStyle(.green)
+                        } else {
+                            Text("Non configurato")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+            
             // MARK: - Logout
             Section {
                 Button(role: .destructive) {

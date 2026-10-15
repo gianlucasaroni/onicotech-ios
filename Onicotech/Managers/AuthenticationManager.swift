@@ -7,19 +7,50 @@ import Combine
 enum StorageKeys {
     static let authToken = "authToken"
     static let refreshToken = "refreshToken"
+    static let biometricEmail = "biometricEmail"
+    static let biometricPassword = "biometricPassword"
+    static let isBiometricsEnabled = "isBiometricsEnabled"
 }
 
 @MainActor
 class AuthenticationManager: ObservableObject {
     @Published var isAuthenticated = false
     @Published var user: User?
-    @Published var isBiometricsEnabled = false
+    @Published var hasBiometricsSaved = false
     @Published var biometricsType: LABiometryType = .none
     
     private var sessionExpiredObserver: Any?
     
+    var hasBiometricHardware: Bool {
+        biometricsType != .none
+    }
+    
+    var canUseBiometrics: Bool {
+        biometricsType != .none && hasBiometricsSaved
+    }
+    
+    var biometricsName: String {
+        switch biometricsType {
+        case .faceID: return "FaceID"
+        case .touchID: return "TouchID"
+        case .opticID: return "OpticID"
+        default: return "Biometria"
+        }
+    }
+    
+    var biometricsIconName: String {
+        switch biometricsType {
+        case .faceID: return "faceid"
+        case .touchID: return "touchid"
+        case .opticID: return "opticid"
+        default: return "lock.fill"
+        }
+    }
+    
     init() {
         checkBiometrics()
+        self.hasBiometricsSaved = KeychainHelper.shared.readString(key: StorageKeys.biometricEmail) != nil &&
+                                  KeychainHelper.shared.readString(key: StorageKeys.biometricPassword) != nil
         
         // Listen for session expiry from APIClient
         sessionExpiredObserver = NotificationCenter.default.addObserver(
@@ -57,6 +88,15 @@ class AuthenticationManager: ObservableObject {
     func login(email: String, password: String) async throws {
         let response = try await APIClient.shared.login(email: email, password: password)
         saveTokens(accessToken: response.token, refreshToken: response.refreshToken)
+        
+        // Save credentials in Keychain for biometric quick-login if supported
+        if biometricsType != .none {
+            KeychainHelper.shared.saveString(key: StorageKeys.biometricEmail, value: email)
+            KeychainHelper.shared.saveString(key: StorageKeys.biometricPassword, value: password)
+            UserDefaults.standard.set(true, forKey: StorageKeys.isBiometricsEnabled)
+            self.hasBiometricsSaved = true
+        }
+        
         self.user = response.user
         self.isAuthenticated = true
     }
@@ -64,6 +104,14 @@ class AuthenticationManager: ObservableObject {
     func register(firstName: String, lastName: String, email: String, password: String) async throws {
         let response = try await APIClient.shared.register(firstName: firstName, lastName: lastName, email: email, password: password)
         saveTokens(accessToken: response.token, refreshToken: response.refreshToken)
+        
+        if biometricsType != .none {
+            KeychainHelper.shared.saveString(key: StorageKeys.biometricEmail, value: email)
+            KeychainHelper.shared.saveString(key: StorageKeys.biometricPassword, value: password)
+            UserDefaults.standard.set(true, forKey: StorageKeys.isBiometricsEnabled)
+            self.hasBiometricsSaved = true
+        }
+        
         self.user = response.user
         self.isAuthenticated = true
     }
@@ -73,6 +121,13 @@ class AuthenticationManager: ObservableObject {
         UserDefaults.standard.removeObject(forKey: StorageKeys.refreshToken)
         self.isAuthenticated = false
         self.user = nil
+    }
+    
+    func clearBiometrics() {
+        KeychainHelper.shared.delete(key: StorageKeys.biometricEmail)
+        KeychainHelper.shared.delete(key: StorageKeys.biometricPassword)
+        UserDefaults.standard.removeObject(forKey: StorageKeys.isBiometricsEnabled)
+        self.hasBiometricsSaved = false
     }
     
     private func saveTokens(accessToken: String, refreshToken: String) {
@@ -100,21 +155,56 @@ class AuthenticationManager: ObservableObject {
             throw AuthError.biometricsNotAvailable
         }
         
-        let reason = "Accedi con FaceID"
+        guard let email = KeychainHelper.shared.readString(key: StorageKeys.biometricEmail),
+              let password = KeychainHelper.shared.readString(key: StorageKeys.biometricPassword) else {
+            throw AuthError.noSavedCredentials
+        }
         
+        let reason = "Accedi al tuo account Onicotech con \(biometricsName)"
+        
+        let success: Bool
         do {
-            let success = try await context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason)
-            
-            if success {
-                 self.isAuthenticated = true
-            }
+            success = try await context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason)
+        } catch let laError as LAError where laError.code == .userCancel || laError.code == .appCancel || laError.code == .systemCancel {
+            throw AuthError.biometricsCancelled
         } catch {
             throw AuthError.biometricsFailed
+        }
+        
+        guard success else {
+            throw AuthError.biometricsFailed
+        }
+        
+        do {
+            let response = try await APIClient.shared.login(email: email, password: password)
+            saveTokens(accessToken: response.token, refreshToken: response.refreshToken)
+            self.user = response.user
+            self.isAuthenticated = true
+        } catch {
+            throw AuthError.credentialsInvalid
         }
     }
 }
 
-enum AuthError: Error {
+enum AuthError: LocalizedError {
     case biometricsNotAvailable
+    case biometricsCancelled
     case biometricsFailed
+    case noSavedCredentials
+    case credentialsInvalid
+    
+    var errorDescription: String? {
+        switch self {
+        case .biometricsNotAvailable:
+            return "Autenticazione biometrica non disponibile su questo dispositivo."
+        case .biometricsCancelled:
+            return "Autenticazione annullata."
+        case .biometricsFailed:
+            return "Riconoscimento biometrico non riuscito."
+        case .noSavedCredentials:
+            return "Nessuna credenziale salvata per l'accesso rapido. Effettua l'accesso con email e password."
+        case .credentialsInvalid:
+            return "Credenziali salvate non più valide. Inserisci nuovamente email e password."
+        }
+    }
 }

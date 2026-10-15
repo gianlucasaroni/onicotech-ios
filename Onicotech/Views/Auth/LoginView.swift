@@ -68,18 +68,20 @@ struct LoginView: View {
                 .disabled(isLoading || email.isEmpty || password.isEmpty)
                 
                 // Biometrics
-                if authManager.biometricsType != .none {
+                if authManager.canUseBiometrics {
                     Button {
                         Task {
-                            try? await authManager.loginWithBiometrics()
+                            await loginWithBiometrics()
                         }
                     } label: {
                         HStack {
-                            Image(systemName: "faceid")
-                            Text("Accedi con FaceID")
+                            Image(systemName: authManager.biometricsIconName)
+                            Text("Accedi con \(authManager.biometricsName)")
                         }
-                        .foregroundStyle(.secondary)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.pink)
                     }
+                    .disabled(isLoading)
                 }
                 
                 // Register Link
@@ -102,6 +104,21 @@ struct LoginView: View {
             try await authManager.login(email: email, password: password)
         } catch {
             errorMessage = "Credenziali non valide o errore di connessione."
+        }
+        isLoading = false
+    }
+    
+    private func loginWithBiometrics() async {
+        isLoading = true
+        errorMessage = nil
+        do {
+            try await authManager.loginWithBiometrics()
+        } catch AuthError.biometricsCancelled {
+            // User cancelled FaceID, do not show error
+        } catch let error as AuthError {
+            errorMessage = error.localizedDescription
+        } catch {
+            errorMessage = "Autenticazione con \(authManager.biometricsName) non riuscita."
         }
         isLoading = false
     }
