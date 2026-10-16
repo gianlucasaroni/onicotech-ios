@@ -7,6 +7,10 @@ struct LoginView: View {
     @State private var password = ""
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @State private var showForgotPasswordAlert = false
+    @State private var forgotPasswordEmail = ""
+    @State private var forgotPasswordNotice: String? = nil
+    @State private var showNoticeAlert = false
     
     var body: some View {
         NavigationStack {
@@ -35,6 +39,16 @@ struct LoginView: View {
                     
                     SecureField("Password", text: $password)
                         .textFieldStyle(.roundedBorder)
+                    
+                    HStack {
+                        Spacer()
+                        Button("Password dimenticata?") {
+                            forgotPasswordEmail = email
+                            showForgotPasswordAlert = true
+                        }
+                        .font(.footnote)
+                        .foregroundStyle(.pink)
+                    }
                 }
                 .padding(.horizontal)
                 
@@ -94,6 +108,43 @@ struct LoginView: View {
                 Spacer()
             }
             .padding()
+            .alert("Recupero Password", isPresented: $showForgotPasswordAlert) {
+                TextField("Email del tuo account", text: $forgotPasswordEmail)
+                    #if os(iOS)
+                    .textInputAutocapitalization(.never)
+                    .keyboardType(.emailAddress)
+                    #endif
+                Button("Invia Link") {
+                    Task {
+                        await sendForgotPassword()
+                    }
+                }
+                Button("Annulla", role: .cancel) { }
+            } message: {
+                Text("Inserisci la tua email. Ti invieremo un link per reimpostare la tua password.")
+            }
+            .alert("Recupero Password", isPresented: $showNoticeAlert) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(forgotPasswordNotice ?? "")
+            }
+        }
+    }
+    
+    private func sendForgotPassword() async {
+        let cleanEmail = forgotPasswordEmail.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanEmail.isEmpty else { return }
+        do {
+            let msg = try await APIClient.shared.forgotPassword(email: cleanEmail)
+            await MainActor.run {
+                forgotPasswordNotice = msg
+                showNoticeAlert = true
+            }
+        } catch {
+            await MainActor.run {
+                forgotPasswordNotice = "Se l'indirizzo email inserito è registrato, riceverai a breve un link per reimpostare la tua password."
+                showNoticeAlert = true
+            }
         }
     }
     

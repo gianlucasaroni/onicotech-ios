@@ -113,6 +113,12 @@ final class APIClient {
         return user
     }
     
+    func forgotPassword(email: String) async throws -> String {
+        let body = ["email": email]
+        let response: APIResponse<[String: String]> = try await request(path: "/auth/forgot-password", method: "POST", body: body)
+        return response.message ?? "Se l'indirizzo email inserito è registrato, riceverai a breve un link per reimpostare la tua password."
+    }
+    
     // MARK: - Token Refresh
     
     private var refreshTask: Task<Void, Error>?
