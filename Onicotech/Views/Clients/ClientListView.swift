@@ -281,6 +281,16 @@ struct ClientRecallRowView: View {
                                 .foregroundStyle(tagColor)
                                 .clipShape(Capsule())
                         }
+                        
+                        if let bday = item.client.formattedBirthDate {
+                            Text("🎂 \(bday)")
+                                .font(.caption2.bold())
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.pink.opacity(0.12))
+                                .foregroundStyle(.pink)
+                                .clipShape(Capsule())
+                        }
                     }
                     
                     if let nailType = item.client.nailType, !nailType.isEmpty {
@@ -429,6 +439,16 @@ struct ClientRowView: View {
                         .padding(.vertical, 2)
                         .background(tagColor.opacity(0.15))
                         .foregroundStyle(tagColor)
+                        .clipShape(Capsule())
+                }
+                
+                if let bday = client.formattedBirthDate {
+                    Text("🎂 \(bday)")
+                        .font(.caption2.bold())
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.pink.opacity(0.12))
+                        .foregroundStyle(.pink)
                         .clipShape(Capsule())
                 }
             }

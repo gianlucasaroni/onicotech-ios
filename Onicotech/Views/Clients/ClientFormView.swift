@@ -17,9 +17,18 @@ struct ClientFormView: View {
     @State private var preferredShape = ""
     @State private var technicalNotes = ""
     @State private var customerTag = ""
+    @State private var birthDay: Int? = nil
+    @State private var birthMonth: Int? = nil
+    @State private var birthYearText = ""
     @State private var selectedPromotionIds: Set<UUID> = []
     @State private var promotions: [Promotion] = []
     @State private var isSaving = false
+    
+    private let italianMonths = [
+        (1, "Gennaio"), (2, "Febbraio"), (3, "Marzo"), (4, "Aprile"),
+        (5, "Maggio"), (6, "Giugno"), (7, "Luglio"), (8, "Agosto"),
+        (9, "Settembre"), (10, "Ottobre"), (11, "Novembre"), (12, "Dicembre")
+    ]
     
     private let nailTypes = [
         "Standard / Naturale",
@@ -145,6 +154,46 @@ struct ClientFormView: View {
                         .textContentType(.emailAddress)
                         .emailKeyboard()
                 }
+
+                Section("Compleanno (Giorno / Mese, Anno facoltativo)") {
+                    HStack {
+                        Picker("Giorno", selection: $birthDay) {
+                            Text("--").tag(nil as Int?)
+                            ForEach(1...31, id: \.self) { day in
+                                Text("\(day)").tag(day as Int?)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        
+                        Picker("Mese", selection: $birthMonth) {
+                            Text("--").tag(nil as Int?)
+                            ForEach(italianMonths, id: \.0) { m in
+                                Text(m.1).tag(m.0 as Int?)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                    }
+                    
+                    HStack {
+                        Text("Anno (facoltativo)")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        TextField("es. 1995", text: $birthYearText)
+                            .keyboardType(.numberPad)
+                            .multilineTextAlignment(.trailing)
+                            .frame(maxWidth: 100)
+                    }
+                    
+                    if birthDay != nil && birthMonth == nil {
+                        Text("Seleziona anche il mese del compleanno")
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    } else if birthMonth != nil && birthDay == nil {
+                        Text("Seleziona anche il giorno del compleanno")
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+                }
                 
                 Section("Altre Note") {
                     TextEditor(text: $notes)
@@ -211,6 +260,11 @@ struct ClientFormView: View {
                     preferredShape = client.preferredShape ?? ""
                     technicalNotes = client.technicalNotes ?? ""
                     customerTag = client.customerTag ?? ""
+                    birthDay = client.birthDay
+                    birthMonth = client.birthMonth
+                    if let year = client.birthYear {
+                        birthYearText = String(year)
+                    }
                     selectedPromotionIds = Set(client.promotionIds)
                 }
                 
@@ -250,6 +304,8 @@ struct ClientFormView: View {
     
     private func save() async {
         isSaving = true
+        let yearParsed = Int(birthYearText.trimmingCharacters(in: .whitespaces))
+        let hasBirthday = birthDay != nil && birthMonth != nil
         let newClient = Client(
             id: client?.id,
             firstName: firstName.trimmingCharacters(in: .whitespaces),
@@ -262,6 +318,10 @@ struct ClientFormView: View {
             preferredShape: preferredShape.isEmpty ? nil : preferredShape,
             technicalNotes: technicalNotes.isEmpty ? nil : technicalNotes,
             customerTag: customerTag.isEmpty ? nil : customerTag,
+            isPhoneMasked: client?.isPhoneMasked,
+            birthDay: hasBirthday ? birthDay : nil,
+            birthMonth: hasBirthday ? birthMonth : nil,
+            birthYear: hasBirthday ? yearParsed : nil,
             promotionIds: Array(selectedPromotionIds)
         )
         

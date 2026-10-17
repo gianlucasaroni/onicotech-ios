@@ -171,6 +171,16 @@ struct ClientDetailView: View {
                     }
                 }
                 
+                if let bday = client.formattedBirthDate {
+                    HStack {
+                        Label("Compleanno", systemImage: "gift.fill")
+                        Spacer()
+                        Text("🎂 \(bday)")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.pink)
+                    }
+                }
+                
                 if let notes = client.notes, !notes.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
                         Label("Note", systemImage: "note.text")
@@ -180,7 +190,7 @@ struct ClientDetailView: View {
                     }
                 }
                 
-                if client.phone == nil && client.email == nil && client.notes == nil {
+                if client.phone == nil && client.email == nil && client.notes == nil && client.formattedBirthDate == nil {
                     Text("Nessun dettaglio aggiuntivo")
                         .foregroundStyle(.secondary)
                 }
