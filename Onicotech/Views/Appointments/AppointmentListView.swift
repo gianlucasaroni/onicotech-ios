@@ -290,6 +290,20 @@ struct AppointmentRowView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
+
+            if let products = appointment.products, !products.isEmpty {
+                HStack(spacing: 4) {
+                    Image(systemName: "bag.fill")
+                        .font(.caption2)
+                    Text("\(products.count) prodott\(products.count == 1 ? "o" : "i") riservat\(products.count == 1 ? "o" : "i")")
+                        .font(.caption2.bold())
+                }
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Color.blue.opacity(0.12))
+                .foregroundStyle(.blue)
+                .clipShape(Capsule())
+            }
             
             HStack {
                 if let notes = appointment.notes, !notes.isEmpty {
@@ -299,8 +313,8 @@ struct AppointmentRowView: View {
                         .lineLimit(1)
                 }
                 Spacer()
-                if let _ = appointment.totalPrice {
-                    Text(appointment.formattedTotalPrice)
+                if appointment.totalPrice != nil || appointment.finalPrice != nil {
+                    Text(appointment.formattedFinalPrice)
                         .font(.subheadline)
                         .fontWeight(.semibold)
                         .foregroundStyle(.primary)

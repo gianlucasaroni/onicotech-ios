@@ -64,9 +64,41 @@ struct Appointment: Codable, Identifiable {
     var promotionId: UUID?
     var promotion: Promotion?
     
+    var servicesTotal: Int {
+        services?.reduce(0) { $0 + ($1.price) } ?? 0
+    }
+
+    var productsTotal: Int {
+        products?.reduce(0) { $0 + ($1.unitPrice * $1.quantity) } ?? 0
+    }
+
+    var calculatedGrandTotal: Int {
+        let serv = servicesTotal
+        let prod = productsTotal
+        let discount = discountAmount ?? 0
+        let base = totalPrice ?? 0
+
+        if prod > 0 && base == serv {
+            return max(0, serv + prod - discount)
+        }
+        if let final = finalPrice, final > 0 {
+            if prod > 0 && final == (serv - discount) {
+                return max(0, final + prod)
+            }
+            return final
+        }
+        if base > 0 {
+            return max(0, base - discount)
+        }
+        return max(0, serv + prod - discount)
+    }
+
     var formattedTotalPrice: String {
-        let value = Double(totalPrice ?? 0) / 100.0
-        return String(format: "€%.2f", value)
+        let serv = servicesTotal
+        let prod = productsTotal
+        let base = totalPrice ?? serv
+        let full = (prod > 0 && base == serv) ? (serv + prod) : base
+        return CurrencyFormatting.euros(fromCents: full)
     }
 
     var formattedDiscountAmount: String {
@@ -75,8 +107,7 @@ struct Appointment: Codable, Identifiable {
     }
 
     var formattedFinalPrice: String {
-        let value = Double(finalPrice ?? totalPrice ?? 0) / 100.0
-        return String(format: "€%.2f", value)
+        CurrencyFormatting.euros(fromCents: calculatedGrandTotal)
     }
     
     var timeRange: String {
@@ -114,16 +145,39 @@ struct AppointmentProduct: Codable, Identifiable {
     var id: UUID?
     var appointmentId: UUID?
     var productId: UUID
+    var productName: String?
+    var category: String?
     var product: Product?
     var quantity: Int
     var unitPrice: Int // cents
+    var subtotal: Int?
+    
+    var displayName: String {
+        if let name = productName, !name.isEmpty {
+            return name
+        }
+        if let name = product?.name, !name.isEmpty {
+            return name
+        }
+        return "Prodotto"
+    }
+    
+    var displayCategory: String? {
+        if let cat = category, !cat.isEmpty {
+            return cat
+        }
+        return product?.category
+    }
     
     var formattedUnitPrice: String {
         CurrencyFormatting.euros(fromCents: unitPrice)
     }
     
     var formattedSubtotal: String {
-        CurrencyFormatting.euros(fromCents: unitPrice * quantity)
+        if let sub = subtotal {
+            return CurrencyFormatting.euros(fromCents: sub)
+        }
+        return CurrencyFormatting.euros(fromCents: unitPrice * quantity)
     }
 }
 

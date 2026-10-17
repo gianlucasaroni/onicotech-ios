@@ -338,9 +338,9 @@ struct AppointmentDetailView: View {
                     ForEach(products) { item in
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("\(item.quantity)x \(item.product?.name ?? "Prodotto")")
+                                Text("\(item.quantity)x \(item.displayName)")
                                     .font(.body)
-                                if let cat = item.product?.category {
+                                if let cat = item.displayCategory, !cat.isEmpty {
                                     Text(cat)
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
@@ -350,6 +350,15 @@ struct AppointmentDetailView: View {
                             Text(item.formattedSubtotal)
                                 .foregroundStyle(.secondary)
                         }
+                    }
+
+                    HStack {
+                        Text("Totale da Saldare (Servizi + Prodotti)")
+                            .fontWeight(.bold)
+                        Spacer()
+                        Text(appointment.formattedFinalPrice)
+                            .fontWeight(.bold)
+                            .foregroundStyle(.blue)
                     }
                 }
             }
