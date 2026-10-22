@@ -143,6 +143,7 @@ struct ProductSaleFormView: View {
             }
             .navigationTitle("Vendita al Banco")
             .inlineNavigationTitle()
+            .scrollDismissesKeyboard(.interactively)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Annulla") {
@@ -214,6 +215,7 @@ struct ProductSaleFormView: View {
         let success = await viewModel.recordSale(req)
         isSubmitting = false
         if success {
+            Haptics.play(.success)
             dismiss()
         }
     }

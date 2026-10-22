@@ -151,6 +151,7 @@ struct ExpenseFormView: View {
             }
             .navigationTitle(isEditing ? "Modifica Spesa" : "Nuova Spesa")
             .inlineNavigationTitle()
+            .scrollDismissesKeyboard(.interactively)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Annulla") { dismiss() }
@@ -247,6 +248,7 @@ struct ExpenseFormView: View {
                 isUploading = false
             }
             
+            Haptics.play(.success)
             onSave()
             dismiss()
         } catch {

@@ -36,7 +36,9 @@ struct PromotionListView: View {
                     }
                 }
                 .refreshable {
+                    Haptics.play(.light)
                     await viewModel.loadPromotions(salonId: salonManager.selectedSalonId)
+                    Haptics.play(.success)
                 }
             }
         }
@@ -45,15 +47,18 @@ struct PromotionListView: View {
         .toolbar {
             ToolbarItem(placement: .automatic) {
                 SalonPickerMenu {
+                    Haptics.play(.selection)
                     Task { await viewModel.loadPromotions(salonId: salonManager.selectedSalonId) }
                 }
             }
             ToolbarItem(placement: .primaryAction) {
                 Button {
+                    Haptics.play(.light)
                     showingAddSheet = true
                 } label: {
                     Image(systemName: "plus")
                 }
+                .accessibilityLabel("Nuova promozione")
             }
         }
         .sheet(isPresented: $showingAddSheet) {
@@ -64,7 +69,8 @@ struct PromotionListView: View {
             Button("Elimina", role: .destructive) {
                 if let promo = promoToDelete {
                     Task {
-                        _ = await viewModel.deletePromotion(id: promo.id)
+                        let ok = await viewModel.deletePromotion(id: promo.id)
+                        if ok { Haptics.play(.warning) }
                     }
                 }
             }

@@ -108,6 +108,7 @@ struct LoginView: View {
                 Spacer()
             }
             .padding()
+            .scrollDismissesKeyboard(.interactively)
             .alert("Recupero Password", isPresented: $showForgotPasswordAlert) {
                 TextField("Email del tuo account", text: $forgotPasswordEmail)
                     #if os(iOS)
@@ -139,11 +140,13 @@ struct LoginView: View {
             await MainActor.run {
                 forgotPasswordNotice = msg
                 showNoticeAlert = true
+                Haptics.play(.success)
             }
         } catch {
             await MainActor.run {
                 forgotPasswordNotice = "Se l'indirizzo email inserito è registrato, riceverai a breve un link per reimpostare la tua password."
                 showNoticeAlert = true
+                Haptics.play(.light)
             }
         }
     }
@@ -153,8 +156,10 @@ struct LoginView: View {
         errorMessage = nil
         do {
             try await authManager.login(email: email, password: password)
+            Haptics.play(.success)
         } catch {
             errorMessage = "Credenziali non valide o errore di connessione."
+            Haptics.play(.error)
         }
         isLoading = false
     }
@@ -164,12 +169,15 @@ struct LoginView: View {
         errorMessage = nil
         do {
             try await authManager.loginWithBiometrics()
+            Haptics.play(.success)
         } catch AuthError.biometricsCancelled {
             // User cancelled FaceID, do not show error
         } catch let error as AuthError {
             errorMessage = error.localizedDescription
+            Haptics.play(.error)
         } catch {
             errorMessage = "Autenticazione con \(authManager.biometricsName) non riuscita."
+            Haptics.play(.error)
         }
         isLoading = false
     }

@@ -108,6 +108,7 @@ struct ClientFormView: View {
                             HStack(spacing: 6) {
                                 ForEach(allergyPresets, id: \.self) { preset in
                                     Button {
+                                        Haptics.play(.selection)
                                         toggleAllergyPreset(preset)
                                     } label: {
                                         Text(preset)
@@ -237,6 +238,7 @@ struct ClientFormView: View {
             }
             .navigationTitle(isEditing ? "Modifica Cliente" : "Nuovo Cliente")
             .inlineNavigationTitle()
+            .scrollDismissesKeyboard(.interactively)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Annulla") { dismiss() }
@@ -333,6 +335,9 @@ struct ClientFormView: View {
         }
         
         isSaving = false
-        if success { dismiss() }
+        if success {
+            Haptics.play(.success)
+            dismiss()
+        }
     }
 }

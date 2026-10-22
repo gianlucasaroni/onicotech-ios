@@ -9,6 +9,7 @@ struct SalonPickerMenu: View {
         Menu {
             if showAllOption && salonManager.hasMultipleSalons {
                 Button {
+                    Haptics.play(.selection)
                     salonManager.selectSalon(nil)
                     onSelectionChanged?()
                 } label: {
@@ -25,6 +26,7 @@ struct SalonPickerMenu: View {
             
             ForEach(salonManager.salons) { salon in
                 Button {
+                    Haptics.play(.selection)
                     salonManager.selectSalon(salon)
                     onSelectionChanged?()
                 } label: {

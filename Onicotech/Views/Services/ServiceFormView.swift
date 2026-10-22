@@ -59,6 +59,7 @@ struct ServiceFormView: View {
             }
             .navigationTitle(isEditing ? "Modifica Servizio" : "Nuovo Servizio")
             .inlineNavigationTitle()
+            .scrollDismissesKeyboard(.interactively)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Annulla") { dismiss() }
@@ -109,6 +110,9 @@ struct ServiceFormView: View {
         }
         
         isSaving = false
-        if success { dismiss() }
+        if success {
+            Haptics.play(.success)
+            dismiss()
+        }
     }
 }

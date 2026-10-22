@@ -73,13 +73,17 @@ struct PhotoHorizontalList<P: ViewablePhoto>: View {
                             
                             if let onPhotoDeleted {
                                 Button {
+                                    Haptics.play(.medium)
                                     onPhotoDeleted(photo)
                                 } label: {
                                     Image(systemName: "xmark.circle.fill")
                                         .font(.caption)
                                         .foregroundStyle(.white, .red)
+                                        .frame(minWidth: 44, minHeight: 44)
+                                        .contentShape(Rectangle())
                                 }
-                                .offset(x: 4, y: -4)
+                                .accessibilityLabel("Elimina foto")
+                                .offset(x: 10, y: -10)
                             }
                         }
                     }

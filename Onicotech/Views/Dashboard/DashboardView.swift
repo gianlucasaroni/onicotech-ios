@@ -125,10 +125,10 @@ struct DashboardView: View {
             } // else
         } // ScrollView
         .navigationTitle("Dashboard")
-        .inlineNavigationTitle()
         .toolbar {
-            ToolbarItem(placement: .automatic) {
+            ToolbarItem(placement: .topBarTrailing) {
                 SalonPickerMenu {
+                    Haptics.play(.selection)
                     Task {
                         await viewModel.loadData(salonId: salonManager.selectedSalonId)
                     }
@@ -145,7 +145,9 @@ struct DashboardView: View {
             await viewModel.loadData(salonId: salonManager.selectedSalonId)
         }
         .refreshable {
+            Haptics.play(.light)
             await viewModel.loadData(salonId: salonManager.selectedSalonId)
+            Haptics.play(.success)
         }
         .alert("Errore", isPresented: $viewModel.showError) {
             Button("OK", role: .cancel) { }
@@ -156,18 +158,19 @@ struct DashboardView: View {
     
     var headerView: some View {
         HStack {
-            VStack(alignment: .leading) {
-                Text(Date.now.formatted(date: .complete, time: .omitted))
+            VStack(alignment: .leading, spacing: 4) {
+                Text(Date.now.formatted(date: .complete, time: .omitted).capitalized)
                     .font(.subheadline)
+                    .fontWeight(.medium)
                     .foregroundStyle(.secondary)
-                if let firstName = authManager.user?.firstName {
-                     Text("Ciao \(firstName) 👋")
-                        .font(.largeTitle)
-                        .bold()
+                if let firstName = authManager.user?.firstName, !firstName.isEmpty {
+                    Text("Ciao \(firstName) 👋")
+                        .font(.title2)
+                        .fontWeight(.bold)
                 } else {
-                     Text("Ciao 👋")
-                        .font(.largeTitle)
-                        .bold()
+                    Text("Bentornata 👋")
+                        .font(.title2)
+                        .fontWeight(.bold)
                 }
             }
             Spacer()

@@ -17,14 +17,17 @@ struct AppointmentListView: View {
                 // Header / Toggle
                 HStack {
                     if !isCalendarExpanded {
-                        HStack(spacing: 20) {
+                        HStack(spacing: 8) {
                             Button {
                                 changeDate(by: -1)
                             } label: {
                                 Image(systemName: "chevron.left")
                                     .font(.title3)
                                     .foregroundStyle(.blue)
+                                    .frame(minWidth: 44, minHeight: 44)
+                                    .contentShape(Rectangle())
                             }
+                            .accessibilityLabel("Giorno precedente")
                             
                             Text(viewModel.selectedDate.formatted(date: .complete, time: .omitted))
                                 .font(.headline)
@@ -36,7 +39,10 @@ struct AppointmentListView: View {
                                 Image(systemName: "chevron.right")
                                     .font(.title3)
                                     .foregroundStyle(.blue)
+                                    .frame(minWidth: 44, minHeight: 44)
+                                    .contentShape(Rectangle())
                             }
+                            .accessibilityLabel("Giorno successivo")
                         }
                     } else {
                         Text("Calendario")
@@ -46,6 +52,7 @@ struct AppointmentListView: View {
                     Spacer()
                     
                     Button {
+                        Haptics.play(.selection)
                         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                             isCalendarExpanded.toggle()
                         }
@@ -53,9 +60,13 @@ struct AppointmentListView: View {
                         Image(systemName: isCalendarExpanded ? "chevron.up.circle.fill" : "calendar.circle.fill")
                             .font(.title2)
                             .foregroundStyle(.secondary)
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
                     }
+                    .accessibilityLabel(isCalendarExpanded ? "Comprimi calendario" : "Espandi vista calendario")
                 }
-                .padding()
+                .padding(.horizontal)
+                .padding(.vertical, 4)
                 
                 if isCalendarExpanded {
                     DatePicker(
@@ -104,7 +115,8 @@ struct AppointmentListView: View {
                                 Button {
                                     Task {
                                         if let id = appointment.id {
-                                            _ = await viewModel.confirmAppointment(id: id)
+                                            let ok = await viewModel.confirmAppointment(id: id)
+                                            if ok { Haptics.play(.success) }
                                         }
                                     }
                                 } label: {
@@ -115,7 +127,8 @@ struct AppointmentListView: View {
                                 Button {
                                     Task {
                                         if let id = appointment.id {
-                                            _ = await viewModel.completeAppointment(id: id)
+                                            let ok = await viewModel.completeAppointment(id: id)
+                                            if ok { Haptics.play(.success) }
                                         }
                                     }
                                 } label: {
@@ -126,6 +139,7 @@ struct AppointmentListView: View {
                         }
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             Button(role: .destructive) {
+                                Haptics.play(.warning)
                                 appointmentToDelete = appointment
                                 showingDeleteAlert = true
                             } label: {
@@ -136,7 +150,8 @@ struct AppointmentListView: View {
                                 Button {
                                     Task {
                                         if let id = appointment.id {
-                                            _ = await viewModel.cancelAppointment(id: id)
+                                            let ok = await viewModel.cancelAppointment(id: id)
+                                            if ok { Haptics.play(.warning) }
                                         }
                                     }
                                 } label: {
@@ -154,6 +169,7 @@ struct AppointmentListView: View {
         .toolbar {
             ToolbarItem(placement: .automatic) {
                 SalonPickerMenu {
+                    Haptics.play(.selection)
                     Task {
                         await viewModel.loadAppointments(salonId: salonManager.selectedSalonId)
                     }
@@ -161,10 +177,12 @@ struct AppointmentListView: View {
             }
             ToolbarItem(placement: .primaryAction) {
                 Button {
+                    Haptics.play(.light)
                     showingAddSheet = true
                 } label: {
                     Image(systemName: "plus")
                 }
+                .accessibilityLabel("Nuovo appuntamento")
             }
         }
         .sheet(isPresented: $showingAddSheet) {
@@ -174,7 +192,10 @@ struct AppointmentListView: View {
             Button("Annulla", role: .cancel) { }
             Button("Elimina", role: .destructive) {
                 if let appt = appointmentToDelete, let id = appt.id {
-                    Task { _ = await viewModel.deleteAppointment(id: id) }
+                    Task {
+                        let ok = await viewModel.deleteAppointment(id: id)
+                        if ok { Haptics.play(.warning) }
+                    }
                 }
             }
         }
@@ -187,12 +208,15 @@ struct AppointmentListView: View {
             await viewModel.loadAppointments(salonId: salonManager.selectedSalonId)
         }
         .refreshable {
+            Haptics.play(.light)
             await viewModel.loadAppointments(salonId: salonManager.selectedSalonId)
+            Haptics.play(.success)
         }
     }
     
     private func changeDate(by days: Int) {
         if let newDate = Calendar.current.date(byAdding: .day, value: days, to: viewModel.selectedDate) {
+            Haptics.play(.selection)
             withAnimation {
                 viewModel.selectedDate = newDate
             }

@@ -141,7 +141,12 @@ struct StatisticsView: View {
                         }
                     }
                 } else {
-                    ContentUnavailableView("Nessun dato", systemImage: "chart.bar.xaxis")
+                    ContentUnavailableView(
+                        "Nessun dato statistico",
+                        systemImage: "chart.bar.xaxis",
+                        description: Text("Non ci sono ancora dati sufficienti per generare l'analisi del periodo.")
+                    )
+                    .padding()
                 }
             }
             .padding(.vertical)
@@ -151,6 +156,7 @@ struct StatisticsView: View {
         .toolbar {
             ToolbarItem(placement: .automatic) {
                 SalonPickerMenu {
+                    Haptics.play(.selection)
                     Task {
                         await viewModel.loadStats(salonId: salonManager.selectedSalonId)
                     }
@@ -167,7 +173,9 @@ struct StatisticsView: View {
             await viewModel.loadStats(salonId: salonManager.selectedSalonId)
         }
         .refreshable {
+            Haptics.play(.light)
             await viewModel.loadStats(salonId: salonManager.selectedSalonId)
+            Haptics.play(.success)
         }
         .alert("Errore", isPresented: $viewModel.showError) {
             Button("OK") { }

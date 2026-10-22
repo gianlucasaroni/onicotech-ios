@@ -287,9 +287,7 @@ struct ClientDetailView: View {
             }
         }
         .sheet(isPresented: $showingEditSheet) {
-            NavigationStack {
-                ClientFormView(viewModel: clientViewModel, client: client)
-            }
+            ClientFormView(viewModel: clientViewModel, client: client)
         }
         #if os(iOS)
         .fullScreenCover(item: $selectedPhoto) { photo in
@@ -309,7 +307,21 @@ struct ClientDetailView: View {
             )
         }
         .sheet(item: $selectedAppointment) { appointment in
-            AppointmentDetailView(appointmentId: appointment.id!, initialAppointment: appointment, viewModel: appointmentViewModel)
+            NavigationStack {
+                AppointmentDetailView(
+                    appointmentId: appointment.id!,
+                    initialAppointment: appointment,
+                    viewModel: appointmentViewModel,
+                    isModal: true
+                )
+            }
+        }
+        .refreshable {
+            Haptics.play(.light)
+            await loadAppointments()
+            await loadPhotos()
+            await loadPromotions()
+            Haptics.play(.success)
         }
         .task {
             await loadAppointments()

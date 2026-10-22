@@ -89,6 +89,7 @@ struct RegisterView: View {
             }
             .padding()
         }
+        .scrollDismissesKeyboard(.interactively)
     }
     
     private var isValid: Bool {
@@ -105,8 +106,10 @@ struct RegisterView: View {
                 email: email,
                 password: password
             )
+            Haptics.play(.success)
             // Auth check in ContentView will auto-dismiss login flow
         } catch {
+            Haptics.play(.error)
             errorMessage = "Errore durante la registrazione. Riprova."
         }
         isLoading = false

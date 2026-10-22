@@ -20,15 +20,18 @@ struct ServiceListView: View {
             } else {
                 List {
                     ForEach(viewModel.services) { service in
-                        ServiceRowView(service: service) {
-                            Task { await viewModel.toggleActive(service: service) }
-                        }
-                        .contentShape(Rectangle())
-                        .onTapGesture {
+                        Button {
+                            Haptics.play(.light)
                             selectedService = service
+                        } label: {
+                            ServiceRowView(service: service) {
+                                Task { await viewModel.toggleActive(service: service) }
+                            }
                         }
+                        .buttonStyle(.plain)
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             Button(role: .destructive) {
+                                Haptics.play(.warning)
                                 serviceToDelete = service
                                 showingDeleteAlert = true
                             } label: {
@@ -38,7 +41,9 @@ struct ServiceListView: View {
                     }
                 }
                 .refreshable {
+                    Haptics.play(.light)
                     await viewModel.loadServices()
+                    Haptics.play(.success)
                 }
             }
         }
@@ -46,10 +51,12 @@ struct ServiceListView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
+                    Haptics.play(.light)
                     showingAddSheet = true
                 } label: {
                     Image(systemName: "plus")
                 }
+                .accessibilityLabel("Nuovo servizio")
             }
         }
         .sheet(isPresented: $showingAddSheet) {
@@ -62,7 +69,10 @@ struct ServiceListView: View {
             Button("Annulla", role: .cancel) { }
             Button("Elimina", role: .destructive) {
                 if let service = serviceToDelete, let id = service.id {
-                    Task { _ = await viewModel.deleteService(id: id) }
+                    Task {
+                        let ok = await viewModel.deleteService(id: id)
+                        if ok { Haptics.play(.warning) }
+                    }
                 }
             }
         } message: {
@@ -104,13 +114,17 @@ struct ServiceRowView: View {
                 Spacer()
                 
                 Button {
+                    Haptics.play(.selection)
                     onToggleActive()
                 } label: {
                     Image(systemName: service.active ? "checkmark.circle.fill" : "circle")
                         .foregroundStyle(service.active ? .green : .gray)
                         .font(.title2)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.borderless)
+                .accessibilityLabel(service.active ? "Disattiva servizio" : "Attiva servizio")
             }
             
             HStack {

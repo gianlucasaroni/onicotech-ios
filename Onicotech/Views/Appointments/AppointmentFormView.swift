@@ -243,6 +243,7 @@ struct AppointmentFormView: View {
                     }
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
             .alert("Errore", isPresented: $viewModel.showError) {
                 Button("OK") { }
             } message: {
@@ -367,7 +368,10 @@ struct AppointmentFormView: View {
         }
         
         isSaving = false
-        if success { dismiss() }
+        if success {
+            Haptics.play(.success)
+            dismiss()
+        }
     }
     
     private func calculateDiscount(total: Int) -> Int {

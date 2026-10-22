@@ -4,12 +4,12 @@ import Security
 import SwiftUI
 import Combine
 
-enum StorageKeys {
-    static let authToken = "authToken"
-    static let refreshToken = "refreshToken"
-    static let biometricEmail = "biometricEmail"
-    static let biometricPassword = "biometricPassword"
-    static let isBiometricsEnabled = "isBiometricsEnabled"
+enum StorageKeys: Sendable {
+    nonisolated static let authToken = "authToken"
+    nonisolated static let refreshToken = "refreshToken"
+    nonisolated static let biometricEmail = "biometricEmail"
+    nonisolated static let biometricPassword = "biometricPassword"
+    nonisolated static let isBiometricsEnabled = "isBiometricsEnabled"
 }
 
 @MainActor

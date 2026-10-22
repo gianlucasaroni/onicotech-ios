@@ -90,6 +90,7 @@ struct ProductStockAdjustSheet: View {
             }
             .navigationTitle("Aggiorna Giacenza")
             .inlineNavigationTitle()
+            .scrollDismissesKeyboard(.interactively)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Annulla") {
@@ -142,6 +143,7 @@ struct ProductStockAdjustSheet: View {
         
         isSubmitting = false
         if success {
+            Haptics.play(.success)
             dismiss()
         }
     }

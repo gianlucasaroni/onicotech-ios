@@ -121,6 +121,7 @@ struct ProductFormView: View {
             }
             .navigationTitle(isEditing ? "Modifica Prodotto" : "Nuovo Prodotto")
             .inlineNavigationTitle()
+            .scrollDismissesKeyboard(.interactively)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Annulla") {
@@ -179,6 +180,7 @@ struct ProductFormView: View {
             let success = await viewModel.updateProduct(id: p.id, req)
             isSubmitting = false
             if success {
+                Haptics.play(.success)
                 dismiss()
             }
         } else {
@@ -205,6 +207,7 @@ struct ProductFormView: View {
             let success = await viewModel.createProduct(req, salonId: salonManager.selectedSalonId)
             isSubmitting = false
             if success {
+                Haptics.play(.success)
                 dismiss()
             }
         }

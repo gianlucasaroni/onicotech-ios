@@ -10,12 +10,15 @@ struct AppointmentDetailView: View {
     let appointmentId: UUID
     let initialAppointment: Appointment
     var viewModel: AppointmentViewModel
+    var isModal: Bool = false
     
     @EnvironmentObject var salonManager: SalonManager
     @Environment(\.dismiss) private var dismiss
     
     @State private var detailedAppointment: Appointment?
     @State private var salonStaff: [SalonMember] = []
+    @State private var showingCancelConfirm = false
+    @State private var showingRejectConfirm = false
     
     private var appointment: Appointment {
         if let detailed = detailedAppointment {
@@ -130,7 +133,11 @@ struct AppointmentDetailView: View {
                 Section("Gestione Richiesta Online") {
                     Button {
                         Task {
-                            _ = await viewModel.confirmAppointment(id: appointmentId)
+                            let ok = await viewModel.confirmAppointment(id: appointmentId)
+                            if ok {
+                                Haptics.play(.success)
+                                await loadAppointmentDetail()
+                            }
                         }
                     } label: {
                         HStack {
@@ -143,9 +150,8 @@ struct AppointmentDetailView: View {
                     .tint(.green)
                     
                     Button(role: .destructive) {
-                        Task {
-                            _ = await viewModel.cancelAppointment(id: appointmentId)
-                        }
+                        Haptics.play(.warning)
+                        showingRejectConfirm = true
                     } label: {
                         HStack {
                             Spacer()
@@ -158,7 +164,11 @@ struct AppointmentDetailView: View {
                 Section {
                     Button {
                         Task {
-                            _ = await viewModel.completeAppointment(id: appointmentId)
+                            let ok = await viewModel.completeAppointment(id: appointmentId)
+                            if ok {
+                                Haptics.play(.success)
+                                await loadAppointmentDetail()
+                            }
                         }
                     } label: {
                         HStack {
@@ -171,9 +181,8 @@ struct AppointmentDetailView: View {
                     .tint(.blue)
                     
                     Button {
-                        Task {
-                            _ = await viewModel.cancelAppointment(id: appointmentId)
-                        }
+                        Haptics.play(.warning)
+                        showingCancelConfirm = true
                     } label: {
                         HStack {
                             Spacer()
@@ -391,12 +400,56 @@ struct AppointmentDetailView: View {
         .navigationTitle("Dettaglio Appuntamento")
         .inlineNavigationTitle()
         .toolbar {
+            if isModal {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Chiudi") { dismiss() }
+                }
+            }
             ToolbarItem(placement: .primaryAction) {
-                Button("Modifica") { showEditSheet = true }
+                Button("Modifica") {
+                    Haptics.play(.light)
+                    showEditSheet = true
+                }
             }
         }
         .sheet(isPresented: $showEditSheet) {
             AppointmentFormView(viewModel: viewModel, appointment: appointment)
+        }
+        .confirmationDialog(
+            "Annullare l'appuntamento?",
+            isPresented: $showingCancelConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Annulla Appuntamento", role: .destructive) {
+                Task {
+                    let ok = await viewModel.cancelAppointment(id: appointmentId)
+                    if ok {
+                        Haptics.play(.warning)
+                        await loadAppointmentDetail()
+                    }
+                }
+            }
+            Button("Indietro", role: .cancel) { }
+        } message: {
+            Text("L'orario tornerà disponibile e l'appuntamento verrà segnato come annullato.")
+        }
+        .confirmationDialog(
+            "Rifiutare la prenotazione online?",
+            isPresented: $showingRejectConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Rifiuta Richiesta", role: .destructive) {
+                Task {
+                    let ok = await viewModel.cancelAppointment(id: appointmentId)
+                    if ok {
+                        Haptics.play(.warning)
+                        await loadAppointmentDetail()
+                    }
+                }
+            }
+            Button("Indietro", role: .cancel) { }
+        } message: {
+            Text("La richiesta di prenotazione online verrà rifiutata.")
         }
         #if os(iOS)
         .photoSourcePicker(
@@ -431,9 +484,11 @@ struct AppointmentDetailView: View {
             await loadPhotos()
         }
         .refreshable {
+            Haptics.play(.light)
             await loadAppointmentDetail()
             await loadStaffIfNeeded()
             await loadPhotos()
+            Haptics.play(.success)
         }
         .onChange(of: showEditSheet) {
             if !showEditSheet {

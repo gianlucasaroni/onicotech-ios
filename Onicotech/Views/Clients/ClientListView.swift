@@ -58,6 +58,9 @@ struct ClientListView: View {
             .pickerStyle(.segmented)
             .padding(.horizontal)
             .padding(.vertical, 8)
+            .onChange(of: selectedTab) {
+                Haptics.play(.selection)
+            }
             
             if selectedTab == .recall {
                 // Soglia giorni (21, 28, 35)
@@ -68,6 +71,7 @@ struct ClientListView: View {
                     
                     ForEach([21, 28, 35], id: \.self) { days in
                         Button {
+                            Haptics.play(.selection)
                             selectedDaysThreshold = days
                             Task {
                                 await viewModel.loadRecallClients(days: days)
@@ -102,10 +106,12 @@ struct ClientListView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
+                    Haptics.play(.light)
                     showingAddSheet = true
                 } label: {
                     Image(systemName: "plus")
                 }
+                .accessibilityLabel("Nuovo cliente")
             }
         }
         .sheet(isPresented: $showingAddSheet) {
@@ -124,8 +130,11 @@ struct ClientListView: View {
             Button("Elimina", role: .destructive) {
                 if let client = clientToDelete, let id = client.id {
                     Task {
-                        _ = await viewModel.deleteClient(id: id)
-                        await viewModel.loadRecallClients(days: selectedDaysThreshold)
+                        let ok = await viewModel.deleteClient(id: id)
+                        if ok {
+                            Haptics.play(.warning)
+                            await viewModel.loadRecallClients(days: selectedDaysThreshold)
+                        }
                     }
                 }
             }
@@ -210,10 +219,37 @@ struct ClientListView: View {
                             ClientRecallRowView(
                                 item: item,
                                 onBookAppointment: {
+                                    Haptics.play(.light)
                                     selectedClientForAppointment = item.client
                                     showingAppointmentSheet = true
                                 }
                             )
+                        }
+                        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                            Button {
+                                Haptics.play(.light)
+                                selectedClientForAppointment = item.client
+                                showingAppointmentSheet = true
+                            } label: {
+                                Label("Prenota", systemImage: "calendar.badge.plus")
+                            }
+                            .tint(.purple)
+                            
+                            if let phone = item.client.phone, !phone.isEmpty, item.client.isPhoneMasked != true {
+                                Link(destination: whatsappURL(for: item)) {
+                                    Label("WhatsApp", systemImage: "message.fill")
+                                }
+                                .tint(.green)
+                            }
+                        }
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button(role: .destructive) {
+                                Haptics.play(.warning)
+                                clientToDelete = item.client
+                                showingDeleteAlert = true
+                            } label: {
+                                Label("Elimina", systemImage: "trash")
+                            }
                         }
                     }
                 } header: {
@@ -222,9 +258,24 @@ struct ClientListView: View {
                 }
             }
             .refreshable {
+                Haptics.play(.light)
                 await viewModel.loadRecallClients(days: selectedDaysThreshold)
+                Haptics.play(.success)
             }
         }
+    }
+    
+    private func whatsappURL(for item: ClientRecall) -> URL {
+        guard let phone = item.client.phone, !phone.isEmpty else {
+            return URL(string: "https://api.whatsapp.com/send")!
+        }
+        let clean = phone.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()
+        let finalPhone = clean.count <= 10 ? "39\(clean)" : clean
+        let servicesStr = item.lastServices.isEmpty ? "" : " (\(item.lastServices.joined(separator: ", ")))"
+        let weeksStr = item.weeksSinceLastAppointment > 1 ? "\(item.weeksSinceLastAppointment) settimane" : "3 settimane"
+        let msg = "Ciao \(item.client.firstName)! ✨ Sono passate circa \(weeksStr) dal tuo ultimo trattamento unghie\(servicesStr).\nLe tue unghie sono pronte per il refill? Se vuoi fissare il tuo prossimo appuntamento prima che l'agenda si riempia, scrivimi pure qui quando ti farebbe comodo! 💅"
+        let encoded = msg.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        return URL(string: "https://api.whatsapp.com/send?phone=\(finalPhone)&text=\(encoded)") ?? URL(string: "https://api.whatsapp.com/send?phone=\(finalPhone)")!
     }
 }
 
@@ -383,11 +434,12 @@ struct ClientRecallRowView: View {
                             .foregroundStyle(.white)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.borderless)
                     }
                 }
                 
                 Button {
+                    Haptics.play(.selection)
                     onBookAppointment()
                 } label: {
                     HStack(spacing: 4) {
@@ -402,7 +454,7 @@ struct ClientRecallRowView: View {
                     .foregroundStyle(.purple)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.borderless)
                 
                 Spacer()
             }

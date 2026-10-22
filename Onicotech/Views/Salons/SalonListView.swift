@@ -102,6 +102,7 @@ struct SalonListView: View {
                                 Button {
                                     Task {
                                         if await viewModel.setDefaultSalon(id: salon.id) {
+                                            Haptics.play(.success)
                                             await salonManager.loadSalons()
                                         }
                                     }
@@ -128,6 +129,7 @@ struct SalonListView: View {
                                 Button {
                                     Task {
                                         if await viewModel.setDefaultSalon(id: salon.id) {
+                                            Haptics.play(.success)
                                             await salonManager.loadSalons()
                                         }
                                     }
@@ -159,10 +161,12 @@ struct SalonListView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
+                    Haptics.play(.light)
                     showingAddSheet = true
                 } label: {
                     Image(systemName: "plus")
                 }
+                .accessibilityLabel("Nuova sede")
             }
         }
         .sheet(isPresented: $showingAddSheet) {
@@ -177,6 +181,7 @@ struct SalonListView: View {
                 if let salon = salonToDelete {
                     Task {
                         if await viewModel.deleteSalon(id: salon.id) {
+                            Haptics.play(.warning)
                             await salonManager.loadSalons()
                         }
                     }
@@ -191,8 +196,10 @@ struct SalonListView: View {
             await viewModel.loadSalons()
         }
         .refreshable {
+            Haptics.play(.light)
             await viewModel.loadSalons()
             await salonManager.loadSalons()
+            Haptics.play(.success)
         }
     }
     
@@ -205,6 +212,7 @@ struct SalonListView: View {
         NSPasteboard.general.setString(fullUrl, forType: .string)
         #endif
         
+        Haptics.play(.success)
         copiedSalonId = salon.id
         Task {
             try? await Task.sleep(nanoseconds: 2_000_000_000)

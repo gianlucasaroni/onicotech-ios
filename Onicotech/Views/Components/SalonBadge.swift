@@ -7,12 +7,12 @@ struct SalonBadge: View {
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: "building.2.fill")
-                .font(.system(size: 9, weight: .bold))
+                .font(.caption2.weight(.bold))
             Text(name)
-                .font(.system(size: 11, weight: .medium))
+                .font(.caption2.weight(.medium))
             if isDefault {
                 Image(systemName: "star.fill")
-                    .font(.system(size: 8))
+                    .font(.caption2)
                     .foregroundStyle(.yellow)
             }
         }

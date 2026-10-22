@@ -42,6 +42,9 @@ struct ProductListView: View {
             .padding(.horizontal)
             .padding(.top, 8)
             .padding(.bottom, 6)
+            .onChange(of: selectedTab) {
+                Haptics.play(.selection)
+            }
             
             if selectedTab == 0 {
                 catalogView
@@ -54,12 +57,14 @@ struct ProductListView: View {
             ToolbarItemGroup(placement: .primaryAction) {
                 if selectedTab == 0 {
                     Button {
+                        Haptics.play(.light)
                         showingAddProductSheet = true
                     } label: {
                         Label("Nuovo Prodotto", systemImage: "plus")
                     }
                 } else {
                     Button {
+                        Haptics.play(.light)
                         showingSaleSheet = true
                     } label: {
                         Label("Nuova Vendita", systemImage: "cart.badge.plus")
@@ -90,7 +95,10 @@ struct ProductListView: View {
             Button("Annulla", role: .cancel) { }
             Button("Elimina", role: .destructive) {
                 if let p = productToDelete {
-                    Task { _ = await viewModel.deleteProduct(id: p.id) }
+                    Task {
+                        let ok = await viewModel.deleteProduct(id: p.id)
+                        if ok { Haptics.play(.warning) }
+                    }
                 }
             }
         } message: {
@@ -102,7 +110,10 @@ struct ProductListView: View {
             Button("Annulla", role: .cancel) { }
             Button("Annulla Vendita", role: .destructive) {
                 if let s = saleToDelete {
-                    Task { _ = await viewModel.deleteSale(id: s.id, salonId: activeSalonId) }
+                    Task {
+                        let ok = await viewModel.deleteSale(id: s.id, salonId: activeSalonId)
+                        if ok { Haptics.play(.warning) }
+                    }
                 }
             }
         } message: {
@@ -114,7 +125,9 @@ struct ProductListView: View {
             await loadData()
         }
         .refreshable {
+            Haptics.play(.light)
             await loadData()
+            Haptics.play(.success)
         }
     }
     

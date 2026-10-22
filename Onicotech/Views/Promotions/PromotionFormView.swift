@@ -69,6 +69,7 @@ struct PromotionFormView: View {
                     } else {
                         List(clientViewModel.clients) { client in
                             Button {
+                                Haptics.play(.selection)
                                 if selectedClients.contains(client.id ?? UUID()) {
                                     selectedClients.remove(client.id ?? UUID())
                                 } else {
@@ -91,6 +92,7 @@ struct PromotionFormView: View {
             }
             .navigationTitle(isEditing ? "Modifica Promozione" : "Nuova Promozione")
             .inlineNavigationTitle()
+            .scrollDismissesKeyboard(.interactively)
             .task {
                 await clientViewModel.loadClients()
             }
@@ -155,6 +157,7 @@ struct PromotionFormView: View {
             }
             
             if success {
+                Haptics.play(.success)
                 dismiss()
             }
         }

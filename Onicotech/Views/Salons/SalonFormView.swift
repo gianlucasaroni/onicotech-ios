@@ -123,6 +123,7 @@ struct SalonFormView: View {
             }
             .navigationTitle(isEditing ? "Modifica Sede" : "Nuova Sede")
             .inlineNavigationTitle()
+            .scrollDismissesKeyboard(.interactively)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Annulla") { dismiss() }
@@ -260,6 +261,7 @@ struct SalonFormView: View {
         
         isSaving = false
         if success {
+            Haptics.play(.success)
             await salonManager.loadSalons()
             dismiss()
         }

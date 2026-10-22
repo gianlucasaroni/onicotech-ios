@@ -26,7 +26,7 @@ struct ContentView: View {
                     }
                 }
                 
-                Tab("Gestione", systemImage: "slider.horizontal.3") {
+                Tab("Gestione", systemImage: "square.grid.2x2") {
                     ManagementView()
                 }
             }

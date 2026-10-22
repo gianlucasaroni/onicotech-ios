@@ -172,6 +172,7 @@ struct BookingSettingsView: View {
         NSPasteboard.general.setString(fullUrl, forType: .string)
         #endif
         
+        Haptics.play(.success)
         withAnimation {
             copiedFeedback = true
         }

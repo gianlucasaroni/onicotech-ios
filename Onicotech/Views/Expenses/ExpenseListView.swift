@@ -11,6 +11,8 @@ struct ExpenseListView: View {
         return f.string(from: .now)
     }()
     @State private var selectedCategory: ExpenseCategory?
+    @State private var expenseToDelete: Expense?
+    @State private var showingDeleteConfirm = false
     
     private var monthlyTotal: Int {
         expenses.reduce(0) { $0 + $1.amount }
@@ -50,13 +52,17 @@ struct ExpenseListView: View {
             
             // Expense list
             Section("Spese") {
-                if isLoading {
+                if isLoading && expenses.isEmpty {
                     ProgressView()
                         .frame(maxWidth: .infinity)
                 } else if expenses.isEmpty {
-                    Text("Nessuna spesa registrata")
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity)
+                    ContentUnavailableView(
+                        "Nessuna Spesa",
+                        systemImage: "creditcard.and.123",
+                        description: Text("Nessuna uscita registrata per il mese e la categoria selezionati.")
+                    )
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
                 } else {
                     ForEach(expenses) { expense in
                         NavigationLink {
@@ -66,8 +72,16 @@ struct ExpenseListView: View {
                         } label: {
                             ExpenseRowView(expense: expense)
                         }
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button(role: .destructive) {
+                                Haptics.play(.warning)
+                                expenseToDelete = expense
+                                showingDeleteConfirm = true
+                            } label: {
+                                Label("Elimina", systemImage: "trash")
+                            }
+                        }
                     }
-                    .onDelete(perform: deleteExpenses)
                 }
             }
         }
@@ -76,15 +90,18 @@ struct ExpenseListView: View {
         .toolbar {
             ToolbarItem(placement: .automatic) {
                 SalonPickerMenu {
+                    Haptics.play(.selection)
                     Task { await loadExpenses() }
                 }
             }
             ToolbarItem(placement: .primaryAction) {
                 Button {
+                    Haptics.play(.light)
                     showingForm = true
                 } label: {
                     Image(systemName: "plus")
                 }
+                .accessibilityLabel("Nuova spesa")
             }
         }
         .sheet(isPresented: $showingForm) {
@@ -92,7 +109,32 @@ struct ExpenseListView: View {
                 Task { await loadExpenses() }
             })
         }
+        .alert("Eliminare questa spesa?", isPresented: $showingDeleteConfirm) {
+            Button("Annulla", role: .cancel) { }
+            Button("Elimina", role: .destructive) {
+                if let exp = expenseToDelete, let id = exp.id {
+                    Task {
+                        do {
+                            try await APIClient.shared.deleteExpense(id: id)
+                            Haptics.play(.warning)
+                            await loadExpenses()
+                        } catch {
+                            print("Error deleting expense: \(error)")
+                        }
+                    }
+                }
+            }
+        } message: {
+            if let exp = expenseToDelete {
+                Text("Vuoi davvero eliminare la spesa \"\(exp.description)\" di \(exp.formattedAmount)?")
+            }
+        }
         .task { await loadExpenses() }
+        .refreshable {
+            Haptics.play(.light)
+            await loadExpenses()
+            Haptics.play(.success)
+        }
         .onChange(of: selectedMonth) { _, _ in
             Task { await loadExpenses() }
         }
