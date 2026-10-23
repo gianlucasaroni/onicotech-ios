@@ -46,14 +46,11 @@ struct ClientListView: View {
         VStack(spacing: 0) {
             // Segmented Picker
             Picker("Sezione", selection: $selectedTab) {
-                Text("Tutti (\(viewModel.clients.count))").tag(ClientListTab.all)
-                HStack {
-                    Text("Da Ricontattare")
-                    if !viewModel.recallClients.isEmpty {
-                        Text("(\(viewModel.recallClients.count))")
-                    }
-                }
-                .tag(ClientListTab.recall)
+                Text("Tutti (\(viewModel.clients.count))")
+                    .tag(ClientListTab.all)
+                
+                Text(viewModel.recallClients.isEmpty ? "Da Ricontattare" : "Da Ricontattare (\(viewModel.recallClients.count))")
+                    .tag(ClientListTab.recall)
             }
             .pickerStyle(.segmented)
             .padding(.horizontal)
