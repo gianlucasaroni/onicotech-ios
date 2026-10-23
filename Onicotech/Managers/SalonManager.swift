@@ -39,6 +39,7 @@ final class SalonManager: ObservableObject {
         } else {
             UserDefaults.standard.set("all", forKey: userDefaultsKey)
         }
+        WatchConnectivityManager.shared.syncState(salon: salon)
     }
     
     func loadSalons() async {

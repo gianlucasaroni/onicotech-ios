@@ -64,7 +64,9 @@ struct SalonFormView: View {
                                 .font(.system(.subheadline, design: .monospaced))
                             
                             TextField("slug-sede", text: $slug)
+                                #if os(iOS)
                                 .textInputAutocapitalization(.never)
+                                #endif
                                 .autocorrectionDisabled()
                                 .font(.system(.subheadline, design: .monospaced))
                                 .onChange(of: slug) { _, newSlug in

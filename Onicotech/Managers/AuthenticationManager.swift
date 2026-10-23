@@ -71,6 +71,7 @@ class AuthenticationManager: ObservableObject {
                 do {
                     let user = try await APIClient.shared.getProfile()
                     self.user = user
+                    WatchConnectivityManager.shared.syncState()
                 } catch {
                     print("Sessione scaduta o non valida: \(error)")
                     self.logout()
@@ -121,6 +122,7 @@ class AuthenticationManager: ObservableObject {
         UserDefaults.standard.removeObject(forKey: StorageKeys.refreshToken)
         self.isAuthenticated = false
         self.user = nil
+        WatchConnectivityManager.shared.syncState(token: "")
     }
     
     func clearBiometrics() {
@@ -133,6 +135,7 @@ class AuthenticationManager: ObservableObject {
     private func saveTokens(accessToken: String, refreshToken: String) {
         UserDefaults.standard.set(accessToken, forKey: StorageKeys.authToken)
         UserDefaults.standard.set(refreshToken, forKey: StorageKeys.refreshToken)
+        WatchConnectivityManager.shared.syncState(token: accessToken)
     }
     
     // MARK: - Biometrics

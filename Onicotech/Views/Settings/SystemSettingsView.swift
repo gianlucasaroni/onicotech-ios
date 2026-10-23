@@ -56,6 +56,36 @@ struct SystemSettingsView: View {
                 }
             }
             
+            #if os(iOS)
+            Section("Apple Watch") {
+                HStack {
+                    Label("Stato Apple Watch", systemImage: "applewatch")
+                    Spacer()
+                    if WatchConnectivityManager.shared.isWatchAppInstalled {
+                        Text("App Installata")
+                            .font(.caption)
+                            .foregroundStyle(.green)
+                    } else if WatchConnectivityManager.shared.isWatchPaired {
+                        Text("Abbinato")
+                            .font(.caption)
+                            .foregroundStyle(.blue)
+                    } else {
+                        Text("Non rilevato")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                
+                Button {
+                    WatchConnectivityManager.shared.syncState()
+                    Haptics.play(.success)
+                } label: {
+                    Label("Sincronizza con Apple Watch", systemImage: "arrow.triangle.2.circlepath")
+                        .foregroundStyle(Color.accentColor)
+                }
+            }
+            #endif
+            
             Section("Informazioni Applicazione") {
                 HStack {
                     Text("Nome App")

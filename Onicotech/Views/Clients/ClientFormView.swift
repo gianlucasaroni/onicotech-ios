@@ -180,7 +180,7 @@ struct ClientFormView: View {
                             .foregroundStyle(.secondary)
                         Spacer()
                         TextField("es. 1995", text: $birthYearText)
-                            .keyboardType(.numberPad)
+                            .numberKeyboard()
                             .multilineTextAlignment(.trailing)
                             .frame(maxWidth: 100)
                     }

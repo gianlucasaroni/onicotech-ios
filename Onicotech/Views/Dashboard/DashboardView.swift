@@ -126,7 +126,7 @@ struct DashboardView: View {
         } // ScrollView
         .navigationTitle("Dashboard")
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItem(placement: .primaryAction) {
                 SalonPickerMenu {
                     Haptics.play(.selection)
                     Task {

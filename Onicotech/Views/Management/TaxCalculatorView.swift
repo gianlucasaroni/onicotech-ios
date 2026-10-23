@@ -77,7 +77,7 @@ struct TaxCalculatorView: View {
                         .bold()
                         .foregroundColor(.purple)
                     TextField("Importo", text: $amountString)
-                        .keyboardType(.decimalPad)
+                        .decimalKeyboard()
                         .font(.title2)
                         .bold()
                 }
