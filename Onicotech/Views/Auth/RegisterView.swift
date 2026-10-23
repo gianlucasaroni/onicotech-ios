@@ -66,19 +66,22 @@ struct RegisterView: View {
                         await register()
                     }
                 } label: {
-                    if isLoading {
-                        ProgressView()
-                            .tint(.white)
-                    } else {
-                        Text("Registrati")
-                            .fontWeight(.semibold)
+                    Group {
+                        if isLoading {
+                            ProgressView()
+                                .tint(.white)
+                        } else {
+                            Text("Registrati")
+                                .fontWeight(.semibold)
+                        }
                     }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(isValid ? Color.pink : Color.gray.opacity(0.3))
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .contentShape(RoundedRectangle(cornerRadius: 12))
                 }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(isValid ? Color.pink : Color.gray.opacity(0.3))
-                .foregroundStyle(.white)
-                .cornerRadius(12)
                 .padding(.horizontal)
                 .disabled(!isValid || isLoading)
                 

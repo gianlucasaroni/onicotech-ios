@@ -65,19 +65,22 @@ struct LoginView: View {
                         await login()
                     }
                 } label: {
-                    if isLoading {
-                        ProgressView()
-                            .tint(.white)
-                    } else {
-                        Text("Accedi")
-                            .fontWeight(.semibold)
+                    Group {
+                        if isLoading {
+                            ProgressView()
+                                .tint(.white)
+                        } else {
+                            Text("Accedi")
+                                .fontWeight(.semibold)
+                        }
                     }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.pink)
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .contentShape(RoundedRectangle(cornerRadius: 12))
                 }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(Color.pink)
-                .foregroundStyle(.white)
-                .cornerRadius(12)
                 .padding(.horizontal)
                 .disabled(isLoading || email.isEmpty || password.isEmpty)
                 
