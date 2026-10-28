@@ -61,6 +61,13 @@ struct Client: Codable, Identifiable, Hashable {
         "\(firstName) \(lastName)"
     }
 
+    var initials: String {
+        let f = firstName.prefix(1)
+        let l = lastName.prefix(1)
+        let res = "\(f)\(l)".trimmingCharacters(in: .whitespaces)
+        return res.isEmpty ? "?" : res.uppercased()
+    }
+
     var formattedBirthDate: String? {
         if let birthDate = birthDate, !birthDate.isEmpty {
             return birthDate

@@ -477,9 +477,12 @@ final class APIClient {
     
     // MARK: - Appointments
     
-    func getAppointments(date: String? = nil, salonId: UUID? = nil) async throws -> [Appointment] {
+    func getAppointments(date: String? = nil, startDate: String? = nil, endDate: String? = nil, salonId: UUID? = nil) async throws -> [Appointment] {
         var queryItems: [URLQueryItem] = []
-        if let date {
+        if let startDate, let endDate {
+            queryItems.append(URLQueryItem(name: "startDate", value: startDate))
+            queryItems.append(URLQueryItem(name: "endDate", value: endDate))
+        } else if let date {
             queryItems.append(URLQueryItem(name: "date", value: date))
         }
         if let salonId {

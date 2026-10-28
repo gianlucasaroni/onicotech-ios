@@ -4,28 +4,142 @@ internal import EventKit
 import SwiftUI
 import Combine
 
+enum AppointmentViewMode: String, CaseIterable, Identifiable {
+    case day = "Giorno"
+    case week = "Settimana"
+    var id: String { rawValue }
+}
+
 @Observable
 @MainActor
 class AppointmentViewModel {
-    var appointments: [Appointment] = []
+    var appointments: [Appointment] = [] {
+        didSet {
+            rebuildAppointmentsByDate()
+        }
+    }
+    private(set) var appointmentsByDate: [String: [Appointment]] = [:]
+    
     var isLoading = false
     var errorMessage: String?
     var showError = false
     var selectedDate: Date = .now
+    var viewMode: AppointmentViewMode = .week
     
     private let api = APIClient.shared
     
+    // Cached formatters to eliminate repeated allocations
+    private static let isoDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.calendar = Calendar(identifier: .gregorian)
+        return f
+    }()
+    
+    private static let shortMonthFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "it_IT")
+        f.dateFormat = "MMM"
+        return f
+    }()
+    
+    private static let yearFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "it_IT")
+        f.dateFormat = "yyyy"
+        return f
+    }()
+    
+    private func rebuildAppointmentsByDate() {
+        var grouped: [String: [Appointment]] = [:]
+        for appt in appointments {
+            grouped[appt.date, default: []].append(appt)
+        }
+        for (dateKey, list) in grouped {
+            grouped[dateKey] = list.sorted { $0.startMinutes < $1.startMinutes }
+        }
+        appointmentsByDate = grouped
+    }
+    
     var selectedDateString: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.string(from: selectedDate)
+        Self.isoDateFormatter.string(from: selectedDate)
+    }
+    
+    var currentWeekMonday: Date {
+        var cal = Calendar(identifier: .gregorian)
+        cal.firstWeekday = 2 // Monday
+        let comps = cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: selectedDate)
+        return cal.date(from: comps) ?? selectedDate
+    }
+    
+    var currentWeekSunday: Date {
+        var cal = Calendar(identifier: .gregorian)
+        cal.firstWeekday = 2
+        return cal.date(byAdding: .day, value: 6, to: currentWeekMonday) ?? selectedDate
+    }
+    
+    var currentWeekDays: [Date] {
+        var cal = Calendar(identifier: .gregorian)
+        cal.firstWeekday = 2
+        let monday = currentWeekMonday
+        return (0..<7).compactMap { cal.date(byAdding: .day, value: $0, to: monday) }
+    }
+    
+    var currentWeekRangeStrings: (start: String, end: String) {
+        (Self.isoDateFormatter.string(from: currentWeekMonday), Self.isoDateFormatter.string(from: currentWeekSunday))
+    }
+    
+    var weekRangeTitle: String {
+        let cal = Calendar(identifier: .gregorian)
+        let monday = currentWeekMonday
+        let sunday = currentWeekSunday
+        
+        let mDay = cal.component(.day, from: monday)
+        let sDay = cal.component(.day, from: sunday)
+        let mMonth = Self.shortMonthFormatter.string(from: monday).capitalized
+        let sMonth = Self.shortMonthFormatter.string(from: sunday).capitalized
+        let sYear = Self.yearFormatter.string(from: sunday)
+        
+        if cal.component(.month, from: monday) == cal.component(.month, from: sunday) {
+            return "\(mDay) – \(sDay) \(sMonth) \(sYear)"
+        } else {
+            return "\(mDay) \(mMonth) – \(sDay) \(sMonth) \(sYear)"
+        }
+    }
+    
+    var isCurrentWeekToday: Bool {
+        let cal = Calendar.current
+        return currentWeekDays.contains { cal.isDateInToday($0) }
+    }
+    
+    func appointments(for date: Date) -> [Appointment] {
+        let dateStr = Self.isoDateFormatter.string(from: date)
+        return appointmentsByDate[dateStr] ?? []
+    }
+    
+    func changeWeek(by weeks: Int) {
+        var cal = Calendar(identifier: .gregorian)
+        cal.firstWeekday = 2
+        if let newDate = cal.date(byAdding: .day, value: weeks * 7, to: selectedDate) {
+            selectedDate = newDate
+        }
+    }
+    
+    func goToToday() {
+        selectedDate = .now
     }
     
     func loadAppointments(salonId: UUID? = nil) async {
         isLoading = true
         errorMessage = nil
         do {
-            appointments = try await api.getAppointments(date: selectedDateString, salonId: salonId)
+            if viewMode == .week {
+                let range = currentWeekRangeStrings
+                appointments = try await api.getAppointments(startDate: range.start, endDate: range.end, salonId: salonId)
+            } else {
+                appointments = try await api.getAppointments(date: selectedDateString, salonId: salonId)
+            }
         } catch {
             errorMessage = error.localizedDescription
             showError = true

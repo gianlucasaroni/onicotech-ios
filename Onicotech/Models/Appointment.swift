@@ -116,6 +116,32 @@ struct Appointment: Codable, Identifiable {
         }
         return startTime
     }
+    
+    var startMinutes: Int {
+        let parts = startTime.split(separator: ":").compactMap { Int($0) }
+        guard parts.count >= 2 else { return 0 }
+        return parts[0] * 60 + parts[1]
+    }
+    
+    var durationMinutes: Int {
+        if let endTime {
+            let parts = endTime.split(separator: ":").compactMap { Int($0) }
+            if parts.count >= 2 {
+                let endMin = parts[0] * 60 + parts[1]
+                let diff = endMin - startMinutes
+                if diff > 0 { return diff }
+            }
+        }
+        if let services, !services.isEmpty {
+            let total = services.reduce(0) { $0 + $1.duration }
+            if total > 0 { return total }
+        }
+        return 60
+    }
+    
+    var endMinutes: Int {
+        startMinutes + durationMinutes
+    }
 }
 
 struct CreateAppointmentRequest: Codable {

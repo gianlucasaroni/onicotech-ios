@@ -1,16 +1,110 @@
 import SwiftUI
 
+struct AppointmentSlotContext: Identifiable {
+    let id = UUID()
+    let date: Date
+    let time: Date?
+}
+
 struct AppointmentListView: View {
     @EnvironmentObject var salonManager: SalonManager
     @State private var viewModel = AppointmentViewModel()
-    @State private var showingAddSheet = false
+    @State private var newAppointmentSlot: AppointmentSlotContext?
     @State private var selectedAppointment: Appointment?
     @State private var showingDeleteAlert = false
     @State private var appointmentToDelete: Appointment?
     
     @State private var isCalendarExpanded = true
+    @AppStorage("appointmentViewMode") private var storedViewMode: AppointmentViewMode = .week
     
     var body: some View {
+        VStack(spacing: 0) {
+            // View Mode Segmented Control (Settimana / Giorno)
+            Picker("Vista", selection: $viewModel.viewMode) {
+                Text("Settimana").tag(AppointmentViewMode.week)
+                Text("Giorno").tag(AppointmentViewMode.day)
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal)
+            .padding(.top, 4)
+            .padding(.bottom, 6)
+            .background(Color.systemBackgroundCompat)
+            
+            if viewModel.viewMode == .week {
+                // MARK: - Settimana View (Stile Calendario iOS)
+                AppointmentWeekView(
+                    viewModel: viewModel,
+                    onAddAppointment: { date, time in
+                        newAppointmentSlot = AppointmentSlotContext(date: date, time: time)
+                    }
+                )
+            } else {
+                // MARK: - Giorno View (Vista Calendario e Lista Giornaliera)
+                dayViewContent
+            }
+        }
+        .navigationTitle("Appuntamenti")
+        .toolbar {
+            ToolbarItem(placement: .automatic) {
+                SalonPickerMenu {
+                    Haptics.play(.selection)
+                    Task {
+                        await viewModel.loadAppointments(salonId: salonManager.selectedSalonId)
+                    }
+                }
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    Haptics.play(.light)
+                    newAppointmentSlot = AppointmentSlotContext(date: viewModel.selectedDate, time: nil)
+                } label: {
+                    Image(systemName: "plus")
+                }
+                .accessibilityLabel("Nuovo appuntamento")
+            }
+        }
+        .sheet(item: $newAppointmentSlot) { slot in
+            AppointmentFormView(
+                viewModel: viewModel,
+                preselectedDate: slot.date,
+                preselectedTime: slot.time
+            )
+            .id(slot.id)
+        }
+        .alert("Eliminare l'appuntamento?", isPresented: $showingDeleteAlert) {
+            Button("Annulla", role: .cancel) { }
+            Button("Elimina", role: .destructive) {
+                if let appt = appointmentToDelete, let id = appt.id {
+                    Task {
+                        let ok = await viewModel.deleteAppointment(id: id)
+                        if ok { Haptics.play(.warning) }
+                    }
+                }
+            }
+        }
+        .alert("Errore", isPresented: $viewModel.showError) {
+            Button("OK") { }
+        } message: {
+            Text(viewModel.errorMessage ?? "Errore sconosciuto")
+        }
+        .onAppear {
+            viewModel.viewMode = storedViewMode
+        }
+        .onChange(of: viewModel.viewMode) { _, newMode in
+            storedViewMode = newMode
+        }
+        .task(id: "\(salonManager.selectedSalonId?.uuidString ?? "")-\(viewModel.viewMode.rawValue)-\(viewModel.viewMode == .week ? viewModel.currentWeekRangeStrings.start : viewModel.selectedDateString)") {
+            await viewModel.loadAppointments(salonId: salonManager.selectedSalonId)
+        }
+        .refreshable {
+            Haptics.play(.light)
+            await viewModel.loadAppointments(salonId: salonManager.selectedSalonId)
+            Haptics.play(.success)
+        }
+    }
+    
+    // MARK: - Day View Content
+    private var dayViewContent: some View {
         VStack(spacing: 0) {
             // Calendar Section
             VStack(spacing: 0) {
@@ -83,15 +177,10 @@ struct AppointmentListView: View {
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
             .padding(.horizontal)
-            .padding(.top, 8)
-            .onChange(of: viewModel.selectedDate) {
-                Task { await viewModel.loadAppointments(salonId: salonManager.selectedSalonId) }
-            }
-            .onChange(of: salonManager.selectedSalon) {
-                Task { await viewModel.loadAppointments(salonId: salonManager.selectedSalonId) }
-            }
+            .padding(.top, 4)
             
             Divider()
+                .padding(.top, 8)
             
             // Appointments list
             if viewModel.isLoading && viewModel.appointments.isEmpty {
@@ -107,7 +196,7 @@ struct AppointmentListView: View {
             } else {
                 List {
                     ForEach(viewModel.appointments) { appointment in
-                        NavigationLink(destination: AppointmentDetailView(appointmentId: appointment.id!, initialAppointment: appointment, viewModel: viewModel)) {
+                        NavigationLink(destination: AppointmentDetailView(appointmentId: appointment.id ?? UUID(), initialAppointment: appointment, viewModel: viewModel)) {
                             AppointmentRowView(appointment: appointment)
                         }
                         .swipeActions(edge: .leading, allowsFullSwipe: true) {
@@ -164,53 +253,6 @@ struct AppointmentListView: View {
                 }
                 .listStyle(.plain)
             }
-        }
-        .navigationTitle("Appuntamenti")
-        .toolbar {
-            ToolbarItem(placement: .automatic) {
-                SalonPickerMenu {
-                    Haptics.play(.selection)
-                    Task {
-                        await viewModel.loadAppointments(salonId: salonManager.selectedSalonId)
-                    }
-                }
-            }
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    Haptics.play(.light)
-                    showingAddSheet = true
-                } label: {
-                    Image(systemName: "plus")
-                }
-                .accessibilityLabel("Nuovo appuntamento")
-            }
-        }
-        .sheet(isPresented: $showingAddSheet) {
-            AppointmentFormView(viewModel: viewModel, preselectedDate: viewModel.selectedDate)
-        }
-        .alert("Eliminare l'appuntamento?", isPresented: $showingDeleteAlert) {
-            Button("Annulla", role: .cancel) { }
-            Button("Elimina", role: .destructive) {
-                if let appt = appointmentToDelete, let id = appt.id {
-                    Task {
-                        let ok = await viewModel.deleteAppointment(id: id)
-                        if ok { Haptics.play(.warning) }
-                    }
-                }
-            }
-        }
-        .alert("Errore", isPresented: $viewModel.showError) {
-            Button("OK") { }
-        } message: {
-            Text(viewModel.errorMessage ?? "Errore sconosciuto")
-        }
-        .task {
-            await viewModel.loadAppointments(salonId: salonManager.selectedSalonId)
-        }
-        .refreshable {
-            Haptics.play(.light)
-            await viewModel.loadAppointments(salonId: salonManager.selectedSalonId)
-            Haptics.play(.success)
         }
     }
     
