@@ -483,14 +483,12 @@ struct AppointmentFormView: View {
             // Apply preselections for new appointments
             if let preselectedClientId {
                 selectedClientId = preselectedClientId
-                // Auto-select client's promo if they have exactly one
+                // Auto-select client's promo (best discount if multiple)
                 if let client = clients.first(where: { $0.id == preselectedClientId }) {
-                    let validPromoIds = client.promotionIds.filter { pid in
-                        promotions.contains(where: { $0.id == pid })
+                    let validPromos = promotions.filter { p in
+                        client.promotionIds.contains(p.id)
                     }
-                    if validPromoIds.count == 1 {
-                        selectedPromotionId = validPromoIds.first
-                    }
+                    selectedPromotionId = validPromos.max(by: { $0.discountPercent < $1.discountPercent })?.id
                 }
             }
             if let preselectedDate {
@@ -559,14 +557,10 @@ struct AppointmentFormView: View {
         
         if let clientId = newClientId,
            let client = clients.first(where: { $0.id == clientId }) {
-            let validPromoIds = client.promotionIds.filter { pid in
-                promotions.contains(where: { $0.id == pid })
+            let validPromos = promotions.filter { p in
+                client.promotionIds.contains(p.id)
             }
-            if validPromoIds.count == 1 {
-                selectedPromotionId = validPromoIds.first
-            } else {
-                selectedPromotionId = nil
-            }
+            selectedPromotionId = validPromos.max(by: { $0.discountPercent < $1.discountPercent })?.id
         } else {
             selectedPromotionId = nil
         }

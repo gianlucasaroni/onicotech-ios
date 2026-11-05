@@ -3,8 +3,21 @@ import Combine
 
 enum WeekDensityMode: String, CaseIterable, Identifiable {
     case twoDays = "2gg"
+    case workWeek = "Settimana lavorativa"
     case fullWeek = "Settimana"
+    
     var id: String { rawValue }
+    
+    var visibleDaysCount: Int {
+        switch self {
+        case .twoDays:
+            return 2
+        case .workWeek:
+            return 5
+        case .fullWeek:
+            return 7
+        }
+    }
 }
 
 struct AppointmentWeekView: View {
@@ -79,7 +92,7 @@ struct AppointmentWeekView: View {
                     let totalWidth = geometry.size.width
                     let availableWidth = max(100, totalWidth - timeColWidth - separatorWidth)
                     
-                    let colCount: CGFloat = (densityMode == .twoDays) ? 2.0 : 7.0
+                    let colCount: CGFloat = CGFloat(densityMode.visibleDaysCount)
                     let colWidth = floor((availableWidth - separatorWidth * (colCount - 1)) / colCount)
                     
                     VStack(spacing: 0) {
@@ -103,30 +116,26 @@ struct AppointmentWeekView: View {
                                 verticalSeparator
                                 
                                 // Horizontal Scrollable Day Columns
-                                if densityMode == .fullWeek {
-                                    // In full week mode: all 7 days fit screen without horizontal scroll
-                                    daysColumnsContent(colWidth: colWidth)
-                                        .frame(width: availableWidth)
-                                } else {
-                                    // In 2gg mode: smooth horizontal scroll with snapping between days!
-                                    ScrollViewReader { horizontalProxy in
-                                        ScrollView(.horizontal, showsIndicators: false) {
-                                            daysColumnsContent(colWidth: colWidth)
-                                                .scrollTargetLayout()
-                                        }
-                                        .scrollTargetBehavior(.viewAligned)
-                                        .frame(width: availableWidth)
-                                        .onScrollGeometryChange(for: CGFloat.self) { geo in
-                                            geo.contentOffset.x
-                                        } action: { _, newOffset in
-                                            scrollOffsetX = newOffset
-                                        }
-                                        .onAppear {
-                                            scrollToSelectedDay(proxy: horizontalProxy)
-                                        }
-                                        .onChange(of: viewModel.selectedDate) {
-                                            scrollToSelectedDay(proxy: horizontalProxy)
-                                        }
+                                ScrollViewReader { horizontalProxy in
+                                    ScrollView(.horizontal, showsIndicators: false) {
+                                        daysColumnsContent(colWidth: colWidth)
+                                            .scrollTargetLayout()
+                                    }
+                                    .scrollTargetBehavior(.viewAligned)
+                                    .frame(width: availableWidth)
+                                    .onScrollGeometryChange(for: CGFloat.self) { geo in
+                                        geo.contentOffset.x
+                                    } action: { _, newOffset in
+                                        scrollOffsetX = newOffset
+                                    }
+                                    .onAppear {
+                                        scrollToSelectedDay(proxy: horizontalProxy)
+                                    }
+                                    .onChange(of: viewModel.selectedDate) {
+                                        scrollToSelectedDay(proxy: horizontalProxy)
+                                    }
+                                    .onChange(of: densityMode) { _, _ in
+                                        scrollToSelectedDay(proxy: horizontalProxy)
                                     }
                                 }
                             }
@@ -149,11 +158,6 @@ struct AppointmentWeekView: View {
         }
         .task(id: salonManager.selectedSalonId) {
             await loadBusinessHours()
-        }
-        .onChange(of: densityMode) { _, newMode in
-            if newMode == .fullWeek {
-                scrollOffsetX = 0
-            }
         }
         .sheet(item: $selectedAppointment) { appointment in
             NavigationStack {
@@ -235,14 +239,34 @@ struct AppointmentWeekView: View {
                     .clipShape(Capsule())
             }
             
-            // View Density Selector (2gg | Settimana)
-            Picker("Vista", selection: $densityMode) {
+            // View Density Selector Dropdown (2gg | Settimana lavorativa | Settimana)
+            Menu {
                 ForEach(WeekDensityMode.allCases) { mode in
-                    Text(mode.rawValue).tag(mode)
+                    Button {
+                        Haptics.play(.selection)
+                        densityMode = mode
+                    } label: {
+                        if densityMode == mode {
+                            Label(mode.rawValue, systemImage: "checkmark")
+                        } else {
+                            Text(mode.rawValue)
+                        }
+                    }
                 }
+            } label: {
+                HStack(spacing: 4) {
+                    Text(densityMode.rawValue)
+                        .font(.caption.weight(.semibold))
+                        .lineLimit(1)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 9, weight: .bold))
+                }
+                .padding(.horizontal, 9)
+                .padding(.vertical, 5)
+                .background(Color.secondary.opacity(0.12))
+                .foregroundStyle(.primary)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
-            .pickerStyle(.segmented)
-            .frame(width: 135)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
@@ -341,7 +365,7 @@ struct AppointmentWeekView: View {
                     verticalSeparator
                 }
             }
-            .offset(x: (densityMode == .fullWeek) ? 0 : -scrollOffsetX)
+            .offset(x: -scrollOffsetX)
             .frame(width: availableWidth, alignment: .leading)
             .clipped()
         }
@@ -703,15 +727,18 @@ struct AppointmentWeekView: View {
     }
     
     private func isDayVisibleInTimeline(index: Int) -> Bool {
-        if densityMode == .fullWeek {
+        let visibleCount = densityMode.visibleDaysCount
+        if visibleCount >= 7 {
             return true
         }
         let availableWidth = max(100, timelineWidth - timeColWidth - separatorWidth)
-        let colWidth = floor((availableWidth - separatorWidth) / 2.0)
+        let colCount = CGFloat(visibleCount)
+        let colWidth = floor((availableWidth - separatorWidth * (colCount - 1)) / colCount)
         let step = colWidth + separatorWidth
-        guard step > 0 else { return index < 2 }
-        let firstIndex = max(0, min(5, Int(round(scrollOffsetX / step))))
-        return index >= firstIndex && index < firstIndex + 2
+        guard step > 0 else { return index < visibleCount }
+        let maxFirstIndex = max(0, 7 - visibleCount)
+        let firstIndex = max(0, min(maxFirstIndex, Int(round(scrollOffsetX / step))))
+        return index >= firstIndex && index < firstIndex + visibleCount
     }
     
     /// High-contrast alternating background between adjacent days

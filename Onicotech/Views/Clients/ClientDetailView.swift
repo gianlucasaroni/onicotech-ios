@@ -28,6 +28,9 @@ struct ClientDetailView: View {
     @State private var errorMessage: String?
     @State private var selectedFilter: AppointmentFilter = .upcoming
     @State private var showingEditSheet = false
+    @State private var showingDeleteAlert = false
+    @State private var isDeleting = false
+    @Environment(\.dismiss) private var dismiss
     @State private var photos: [Photo] = []
     @State private var selectedPhoto: Photo?
     @State private var showingAddAppointmentSheet = false
@@ -281,6 +284,12 @@ struct ClientDetailView: View {
                     } label: {
                         Label("Modifica Cliente", systemImage: "pencil")
                     }
+                    Divider()
+                    Button(role: .destructive) {
+                        showingDeleteAlert = true
+                    } label: {
+                        Label("Elimina Cliente", systemImage: "trash")
+                    }
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
@@ -288,6 +297,24 @@ struct ClientDetailView: View {
         }
         .sheet(isPresented: $showingEditSheet) {
             ClientFormView(viewModel: clientViewModel, client: client)
+        }
+        .alert("Eliminare il cliente?", isPresented: $showingDeleteAlert) {
+            Button("Annulla", role: .cancel) { }
+            Button("Elimina", role: .destructive) {
+                if let id = client.id {
+                    isDeleting = true
+                    Task {
+                        let ok = await clientViewModel.deleteClient(id: id)
+                        isDeleting = false
+                        if ok {
+                            Haptics.play(.warning)
+                            dismiss()
+                        }
+                    }
+                }
+            }
+        } message: {
+            Text("Sei sicura di voler eliminare definitivamente \(client.fullName)?")
         }
         #if os(iOS)
         .fullScreenCover(item: $selectedPhoto) { photo in
