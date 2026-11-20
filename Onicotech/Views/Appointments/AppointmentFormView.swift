@@ -551,7 +551,7 @@ struct AppointmentFormView: View {
         }
     }
     
-    // Watch for client selection change to auto-apply promotion
+    // Watch for client selection change to auto-apply promotion and prefill from last appointment
     func onClientChange(newClientId: UUID?) {
         guard appointment == nil else { return } // Only auto-apply for new appointments
         
@@ -561,6 +561,26 @@ struct AppointmentFormView: View {
                 client.promotionIds.contains(p.id)
             }
             selectedPromotionId = validPromos.max(by: { $0.discountPercent < $1.discountPercent })?.id
+            
+            // Prefill from last completed appointment
+            Task {
+                if let prefill = try? await APIClient.shared.getLastAppointmentForClient(clientId: clientId) {
+                    await MainActor.run {
+                        if !prefill.serviceIds.isEmpty {
+                            selectedServiceIds = Set(prefill.serviceIds)
+                        }
+                        if let staffId = prefill.staffMemberId {
+                            selectedStaffMemberId = staffId
+                        }
+                        if let promoId = prefill.promotionId {
+                            selectedPromotionId = promoId
+                        }
+                        if let notes = prefill.notes, !notes.isEmpty {
+                            self.notes = notes
+                        }
+                    }
+                }
+            }
         } else {
             selectedPromotionId = nil
         }

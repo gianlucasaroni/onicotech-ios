@@ -343,6 +343,11 @@ final class APIClient {
         return response.data ?? []
     }
     
+    func getLastAppointmentForClient(clientId: UUID) async throws -> LastAppointmentPrefill? {
+        let response: APIResponse<LastAppointmentPrefill> = try await request(path: "/clients/\(clientId)/last-appointment")
+        return response.data
+    }
+    
     func getRecallClients(days: Int = 21, salonId: UUID? = nil) async throws -> [ClientRecall] {
         var queryItems: [URLQueryItem] = [
             URLQueryItem(name: "days", value: "\(days)")
