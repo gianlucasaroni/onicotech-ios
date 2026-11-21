@@ -17,6 +17,8 @@ struct ClientListView: View {
     @State private var showingDeleteAlert = false
     @State private var clientToDelete: Client?
     @State private var searchText = ""
+    @EnvironmentObject var salonManager: SalonManager
+    @Environment(\.commandPaletteState) private var commandPaletteState
     
     var filteredClients: [Client] {
         if searchText.isEmpty {
@@ -147,6 +149,22 @@ struct ClientListView: View {
         }
         .task {
             await viewModel.loadAll(days: selectedDaysThreshold)
+            configureCommandPalette()
+        }
+    }
+    
+    private func configureCommandPalette() {
+        commandPaletteState?.setSalonManager(salonManager)
+        commandPaletteState?.updateClients(viewModel.clients)
+        
+        commandPaletteState?.onNewClient = {
+            showingAddSheet = true
+        }
+        
+        commandPaletteState?.onNavigateClients = { search, _ in
+            if let search = search {
+                self.searchText = search
+            }
         }
     }
     

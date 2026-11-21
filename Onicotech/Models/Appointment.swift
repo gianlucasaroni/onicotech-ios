@@ -155,6 +155,13 @@ struct CreateAppointmentRequest: Codable {
     var promotionId: UUID?
 }
 
+struct LastAppointmentPrefill: Codable {
+    var serviceIds: [UUID]
+    var staffMemberId: UUID?
+    var promotionId: UUID?
+    var notes: String?
+}
+
 struct UpdateAppointmentRequest: Codable {
     var date: String
     var startTime: String

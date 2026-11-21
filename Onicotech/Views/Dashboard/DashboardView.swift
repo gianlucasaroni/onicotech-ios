@@ -15,6 +15,12 @@ struct DashboardView: View {
                 // Header
                 headerView
                 
+                // Next Free Slot Widget
+                if let slot = viewModel.nextFreeSlot {
+                    NextFreeSlotWidget(slot: slot)
+                        .padding(.horizontal)
+                }
+                
                 // Pending Online Bookings Banner
                 if viewModel.pendingBookingsCount > 0 {
                     NavigationLink(destination: AppointmentListView()) {
@@ -212,6 +218,102 @@ struct StatCard: View {
         .background(Color.systemBackgroundCompat)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+    }
+}
+
+// MARK: - Next Free Slot Widget
+
+struct NextFreeSlotWidget: View {
+    let slot: NextFreeSlot
+    @State private var showAppointmentForm = false
+    
+    var body: some View {
+        HStack(spacing: 14) {
+            // Icon
+            ZStack {
+                Circle()
+                    .fill(Color.green.opacity(0.15))
+                    .frame(width: 48, height: 48)
+                
+                Image(systemName: "calendar.badge.clock")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(.green)
+            }
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Prossimo slot libero")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.secondary)
+                    .textCase(.uppercase)
+                
+                Text(formattedDate)
+                    .font(.headline)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.primary)
+                
+                HStack(spacing: 8) {
+                    Label(slot.startTime, systemImage: "clock")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    
+                    if let staffName = slot.staffName, !staffName.isEmpty {
+                        Label(staffName, systemImage: "person.fill")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            
+            Spacer()
+            
+            Button {
+                Haptics.play(.light)
+                showAppointmentForm = true
+            } label: {
+                HStack(spacing: 6) {
+                    Text("Prenota")
+                        .font(.subheadline.weight(.semibold))
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(Color.green)
+                .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .sheet(isPresented: $showAppointmentForm) {
+                AppointmentFormView(
+                    viewModel: AppointmentViewModel(),
+                    preselectedDate: parsedSlotDate,
+                    preselectedTime: DateFormatter.timeOnly.date(from: slot.startTime)
+                )
+            }
+        }
+        .padding(16)
+        .background(Color.systemBackgroundCompat)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.green.opacity(0.2), lineWidth: 1)
+        )
+    }
+    
+    private var parsedSlotDate: Date {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        return formatter.date(from: slot.date) ?? Date()
+    }
+    
+    private var formattedDate: String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .full
+        formatter.locale = Locale(identifier: "it_IT")
+        return formatter.string(from: parsedSlotDate).capitalized
     }
 }
 

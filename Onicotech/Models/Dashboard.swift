@@ -22,3 +22,15 @@ struct DashboardData: Codable {
         self.monthlyEarnings = try container.decodeIfPresent(Int.self, forKey: .monthlyEarnings) ?? 0
     }
 }
+
+struct NextFreeSlot: Codable {
+    let date: String
+    let startTime: String
+    let staffName: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case date
+        case startTime
+        case staffName
+    }
+}

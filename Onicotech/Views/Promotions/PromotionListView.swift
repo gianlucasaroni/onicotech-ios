@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PromotionListView: View {
     @EnvironmentObject var salonManager: SalonManager
+    @Environment(\.commandPaletteState) private var commandPaletteState
     @StateObject private var viewModel = PromotionViewModel()
     @State private var showingAddSheet = false
     @State private var showingDeleteAlert = false
@@ -84,7 +85,13 @@ struct PromotionListView: View {
         }
         .task {
             await viewModel.loadPromotions(salonId: salonManager.selectedSalonId)
+            configureCommandPalette()
         }
+    }
+    
+    private func configureCommandPalette() {
+        commandPaletteState?.setSalonManager(salonManager)
+        commandPaletteState?.updatePromotions(viewModel.promotions)
     }
 }
 

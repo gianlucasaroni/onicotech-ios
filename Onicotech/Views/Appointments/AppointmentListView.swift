@@ -8,6 +8,7 @@ struct AppointmentSlotContext: Identifiable {
 
 struct AppointmentListView: View {
     @EnvironmentObject var salonManager: SalonManager
+    @Environment(\.commandPaletteState) private var commandPaletteState
     @State private var viewModel = AppointmentViewModel()
     @State private var newAppointmentSlot: AppointmentSlotContext?
     @State private var selectedAppointment: Appointment?
@@ -89,6 +90,7 @@ struct AppointmentListView: View {
         }
         .onAppear {
             viewModel.viewMode = storedViewMode
+            configureCommandPalette()
         }
         .onChange(of: viewModel.viewMode) { _, newMode in
             storedViewMode = newMode
@@ -261,6 +263,21 @@ struct AppointmentListView: View {
             Haptics.play(.selection)
             withAnimation {
                 viewModel.selectedDate = newDate
+            }
+        }
+    }
+    
+    private func configureCommandPalette() {
+        commandPaletteState?.setSalonManager(salonManager)
+        commandPaletteState?.updateAppointments(viewModel.appointments)
+        
+        commandPaletteState?.onNewAppointment = {
+            newAppointmentSlot = AppointmentSlotContext(date: viewModel.selectedDate, time: nil)
+        }
+        
+        commandPaletteState?.onNavigateAppointments = { _, date in
+            if let date = date, let parsed = DateFormatter.iso8601DateOnly.date(from: date) {
+                viewModel.selectedDate = parsed
             }
         }
     }

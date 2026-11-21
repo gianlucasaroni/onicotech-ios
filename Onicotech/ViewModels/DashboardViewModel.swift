@@ -5,6 +5,7 @@ import Observation
 @MainActor
 class DashboardViewModel {
     var data: DashboardData?
+    var nextFreeSlot: NextFreeSlot?
     var isLoading = false
     var errorMessage: String?
     var showError = false
@@ -37,7 +38,10 @@ class DashboardViewModel {
         isLoading = true
         errorMessage = nil
         do {
-            data = try await api.getDashboard(salonId: salonId)
+            async let dashboardData = api.getDashboard(salonId: salonId)
+            async let freeSlot: NextFreeSlot? = try? api.getNextFreeSlot(salonId: salonId)
+            data = try await dashboardData
+            nextFreeSlot = await freeSlot
         } catch {
             errorMessage = error.localizedDescription
             showError = true

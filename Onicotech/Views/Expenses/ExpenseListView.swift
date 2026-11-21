@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ExpenseListView: View {
     @EnvironmentObject var salonManager: SalonManager
+    @Environment(\.commandPaletteState) private var commandPaletteState
     @State private var expenses: [Expense] = []
     @State private var isLoading = true
     @State private var showingForm = false
@@ -158,6 +159,22 @@ struct ExpenseListView: View {
             print("Error loading expenses: \(error)")
         }
         isLoading = false
+        configureCommandPalette()
+    }
+    
+    private func configureCommandPalette() {
+        commandPaletteState?.setSalonManager(salonManager)
+        commandPaletteState?.updateExpenses(expenses)
+        
+        commandPaletteState?.onNewExpense = {
+            showingForm = true
+        }
+        
+        commandPaletteState?.onNavigateExpenses = { newExpense, _ in
+            if newExpense {
+                showingForm = true
+            }
+        }
     }
     
     private func deleteExpenses(at offsets: IndexSet) {

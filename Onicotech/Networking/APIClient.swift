@@ -343,6 +343,11 @@ final class APIClient {
         return response.data ?? []
     }
     
+    func getLastAppointmentForClient(clientId: UUID) async throws -> LastAppointmentPrefill? {
+        let response: APIResponse<LastAppointmentPrefill> = try await request(path: "/clients/\(clientId)/last-appointment")
+        return response.data
+    }
+    
     func getRecallClients(days: Int = 21, salonId: UUID? = nil) async throws -> [ClientRecall] {
         var queryItems: [URLQueryItem] = [
             URLQueryItem(name: "days", value: "\(days)")
@@ -537,6 +542,15 @@ final class APIClient {
         return data
     }
     
+    func getNextFreeSlot(salonId: UUID? = nil) async throws -> NextFreeSlot? {
+        var queryItems: [URLQueryItem]? = nil
+        if let salonId {
+            queryItems = [URLQueryItem(name: "salonId", value: salonId.uuidString)]
+        }
+        let response: APIResponse<NextFreeSlot> = try await request(path: "/dashboard/next-free-slot", queryItems: queryItems)
+        return response.data
+    }
+    
     // MARK: - System
     
     func invalidateCache() async throws {
@@ -607,6 +621,10 @@ final class APIClient {
     func getClientPhotos(clientId: UUID) async throws -> [Photo] {
         let response: APIResponse<[Photo]> = try await request(path: "/clients/\(clientId.uuidString)/photos")
         return response.data ?? []
+    }
+    
+    func getClientNailPhotos(clientId: UUID) async throws -> [Photo] {
+        return try await getClientPhotos(clientId: clientId)
     }
     
     // MARK: - Expenses

@@ -3,6 +3,9 @@ import Observation
 internal import EventKit
 import SwiftUI
 import Combine
+#if canImport(WidgetKit)
+import WidgetKit
+#endif
 
 enum AppointmentViewMode: String, CaseIterable, Identifiable {
     case day = "Giorno"
@@ -140,11 +143,40 @@ class AppointmentViewModel {
             } else {
                 appointments = try await api.getAppointments(date: selectedDateString, salonId: salonId)
             }
+            // Update widget schedule with upcoming appointments
+            updateWidgetSchedule(with: appointments)
         } catch {
             errorMessage = error.localizedDescription
             showError = true
         }
         isLoading = false
+    }
+    
+    private func updateWidgetSchedule(with appointments: [Appointment]) {
+        let now = Date()
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        
+        let upcoming = appointments
+            .filter { $0.status != .completed && $0.status != .cancelled && $0.status != .expired }
+            .compactMap { apt -> Date? in
+                let dateString = "\(apt.date) \(apt.startTime)"
+                return formatter.date(from: dateString)
+            }
+            .filter { $0 > now }
+            .sorted()
+        
+        let schedule = AppointmentSchedule(
+            starts: upcoming,
+            expires: Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: now)) ?? now.addingTimeInterval(86400)
+        )
+        AppointmentSchedule.replace(with: schedule)
+        
+        // Request widget reload
+        #if canImport(WidgetKit)
+        WidgetCenter.shared.reloadTimelines(ofKind: AppointmentSchedule.widgetKind)
+        #endif
     }
     
     func createAppointment(request: CreateAppointmentRequest) async -> Bool {
