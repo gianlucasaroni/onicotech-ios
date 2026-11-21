@@ -35,12 +35,50 @@ struct AppointmentWeekView: View {
     @State private var scrollOffsetX: CGFloat = 0
     @State private var timelineWidth: CGFloat = 390
     @State private var salonBusinessHours: [BusinessHourItem] = []
-    @State private var lastWeekSwipeDate: Date = .distantPast
+    @State private var anchorMonday: Date = AppointmentWeekView.mondayOfWeek(containing: .now)
+    @State private var scrolledDayID: Date? = AppointmentWeekView.startOfDay(.now)
+    @State private var scrolledWeekID: Date? = AppointmentWeekView.mondayOfWeek(containing: .now)
+    @State private var miniStripWeekID: Date? = AppointmentWeekView.mondayOfWeek(containing: .now)
+    @State private var lastScrollDrivenDate: Date? = nil
     
+    private let weeksRadius: Int = 12 // 25 continuous weeks (175 days)
     private let hourHeight: CGFloat = 64.0
     private let timeColWidth: CGFloat = 44.0
     private let headerHeight: CGFloat = 46.0
     private let separatorWidth: CGFloat = 1.0
+
+    private static func startOfDay(_ date: Date) -> Date {
+        Calendar.current.startOfDay(for: date)
+    }
+
+    private static func mondayOfWeek(containing date: Date) -> Date {
+        var cal = Calendar(identifier: .gregorian)
+        cal.firstWeekday = 2
+        let comps = cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: date)
+        let monday = cal.date(from: comps) ?? date
+        return Calendar.current.startOfDay(for: monday)
+    }
+
+    private var timelineWeekMondays: [Date] {
+        let cal = Calendar.current
+        return (-weeksRadius...weeksRadius).compactMap { offset in
+            cal.date(byAdding: .day, value: offset * 7, to: anchorMonday)
+        }
+    }
+
+    private var timelineDays: [Date] {
+        let cal = Calendar.current
+        let totalDays = (weeksRadius * 2 + 1) * 7
+        let startOffset = -weeksRadius * 7
+        return (0..<totalDays).compactMap { idx in
+            cal.date(byAdding: .day, value: startOffset + idx, to: anchorMonday)
+        }
+    }
+
+    private func daysOfWeek(starting monday: Date) -> [Date] {
+        let cal = Calendar.current
+        return (0..<7).compactMap { cal.date(byAdding: .day, value: $0, to: monday) }
+    }
     
     // Dynamic grid start and end hours based on week appointments
     private var minHour: Int {
@@ -74,16 +112,15 @@ struct AppointmentWeekView: View {
                 .background(Color.systemBackgroundCompat)
                 .zIndex(10)
             
-            // MARK: - 2. Apple Calendar 7-Day Mini Strip (Lun..Dom)
+            // MARK: - 2. Apple Calendar 7-Day Mini Strip (Native Paging Across Weeks)
             weekDaysMiniStrip
                 .background(Color.systemBackgroundCompat)
-                .simultaneousGesture(weekSwipeGesture)
                 .zIndex(9)
             
             Divider()
             
             // MARK: - 3. Time Grid Area
-            if viewModel.isLoading && viewModel.appointments.isEmpty {
+            if viewModel.isLoading && !viewModel.hasLoadedOnce && viewModel.appointments.isEmpty {
                 VStack {
                     Spacer()
                     ProgressView("Caricamento appuntamenti...")
@@ -95,16 +132,15 @@ struct AppointmentWeekView: View {
                     let availableWidth = max(100, totalWidth - timeColWidth - separatorWidth)
                     
                     let colCount: CGFloat = CGFloat(densityMode.visibleDaysCount)
-                    let colWidth = floor((availableWidth - separatorWidth * (colCount - 1)) / colCount)
-                    let contentWidth = CGFloat(viewModel.currentWeekDays.count) * (colWidth + separatorWidth)
-                    let maxScrollX = max(0, contentWidth - availableWidth)
+                    let colWidth: CGFloat = densityMode == .fullWeek
+                        ? (availableWidth - separatorWidth * (colCount - 1)) / colCount
+                        : floor((availableWidth - separatorWidth * (colCount - 1)) / colCount)
                     
                     VStack(spacing: 0) {
-                        // MARK: - Sticky Day Headers Strip (Synchronized with columns below!)
+                        // MARK: - Sticky Day Headers Strip (1:1 Locked to Horizontal Scroll)
                         stickyDayHeaders(colWidth: colWidth, availableWidth: availableWidth)
                             .background(Color.systemBackgroundCompat)
                             .shadow(color: .black.opacity(0.03), radius: 2, x: 0, y: 1)
-                            .simultaneousGesture(weekSwipeGesture)
                             .zIndex(8)
                         
                         Divider()
@@ -120,36 +156,32 @@ struct AppointmentWeekView: View {
                                 // Vertical Separator
                                 verticalSeparator
                                 
-                                // Horizontal Scrollable Day Columns
-                                ScrollViewReader { horizontalProxy in
+                                // Native Continuous Multi-Week Horizontal Timeline
+                                if densityMode == .fullWeek {
                                     ScrollView(.horizontal, showsIndicators: false) {
-                                        daysColumnsContent(colWidth: colWidth)
+                                        fullWeekPagesContent(colWidth: colWidth, pageWidth: availableWidth)
+                                            .scrollTargetLayout()
+                                    }
+                                    .scrollTargetBehavior(.paging)
+                                    .scrollPosition(id: $scrolledWeekID, anchor: .leading)
+                                    .frame(width: availableWidth)
+                                    .onScrollGeometryChange(for: CGFloat.self) { geo in
+                                        geo.contentOffset.x
+                                    } action: { _, newOffset in
+                                        scrollOffsetX = newOffset
+                                    }
+                                } else {
+                                    ScrollView(.horizontal, showsIndicators: false) {
+                                        continuousDaysContent(colWidth: colWidth)
                                             .scrollTargetLayout()
                                     }
                                     .scrollTargetBehavior(.viewAligned)
-                                    .scrollDisabled(densityMode == .fullWeek)
+                                    .scrollPosition(id: $scrolledDayID, anchor: .leading)
                                     .frame(width: availableWidth)
-                                    .simultaneousGesture(fullWeekGridSwipeGesture)
                                     .onScrollGeometryChange(for: CGFloat.self) { geo in
                                         geo.contentOffset.x
-                                    } action: { oldOffset, newOffset in
+                                    } action: { _, newOffset in
                                         scrollOffsetX = newOffset
-                                        guard densityMode != .fullWeek else { return }
-                                        let overscrollThreshold: CGFloat = 52
-                                        if newOffset < -overscrollThreshold && oldOffset >= -overscrollThreshold {
-                                            triggerWeekSwipe(direction: -1, landOnEdge: true)
-                                        } else if newOffset > maxScrollX + overscrollThreshold && oldOffset <= maxScrollX + overscrollThreshold {
-                                            triggerWeekSwipe(direction: 1, landOnEdge: true)
-                                        }
-                                    }
-                                    .onAppear {
-                                        scrollToSelectedDay(proxy: horizontalProxy)
-                                    }
-                                    .onChange(of: viewModel.selectedDate) {
-                                        scrollToSelectedDay(proxy: horizontalProxy)
-                                    }
-                                    .onChange(of: densityMode) { _, _ in
-                                        scrollToSelectedDay(proxy: horizontalProxy)
                                     }
                                 }
                             }
@@ -168,6 +200,32 @@ struct AppointmentWeekView: View {
                 } action: { newWidth in
                     timelineWidth = newWidth
                 }
+            }
+        }
+        .onAppear {
+            anchorMonday = Self.mondayOfWeek(containing: viewModel.selectedDate)
+            syncScrollToSelectedDate(animated: false)
+        }
+        .onChange(of: scrolledDayID) { _, newDay in
+            handleScrolledDayChanged(newDay)
+        }
+        .onChange(of: scrolledWeekID) { _, newMonday in
+            handleScrolledWeekChanged(newMonday)
+        }
+        .onChange(of: miniStripWeekID) { _, newMonday in
+            handleMiniStripWeekChanged(newMonday)
+        }
+        .onChange(of: viewModel.selectedDate) { _, newDate in
+            let normalized = Self.startOfDay(newDate)
+            if let driven = lastScrollDrivenDate, Calendar.current.isDate(driven, inSameDayAs: normalized) {
+                lastScrollDrivenDate = nil
+                return
+            }
+            syncScrollToSelectedDate(animated: true)
+        }
+        .onChange(of: densityMode) { _, _ in
+            DispatchQueue.main.async {
+                syncScrollToSelectedDate(animated: false)
             }
         }
         .task(id: salonManager.selectedSalonId) {
@@ -237,6 +295,11 @@ struct AppointmentWeekView: View {
             
             Spacer(minLength: 4)
             
+            if viewModel.isLoading && viewModel.hasLoadedOnce {
+                ProgressView()
+                    .controlSize(.mini)
+            }
+            
             // "Oggi" button
             Button {
                 Haptics.play(.selection)
@@ -286,65 +349,81 @@ struct AppointmentWeekView: View {
         .padding(.vertical, 6)
     }
     
-    // MARK: - 2. Apple Calendar 7-Day Mini Strip (L M M G V S D)
+    // MARK: - 2. Apple Calendar 7-Day Mini Strip (Native Paging Across Weeks)
     private var weekDaysMiniStrip: some View {
         HStack(spacing: 0) {
             Spacer().frame(width: timeColWidth + separatorWidth)
             
-            HStack(spacing: 0) {
-                ForEach(Array(viewModel.currentWeekDays.enumerated()), id: \.element) { index, day in
-                    let isToday = Calendar.current.isDateInToday(day)
-                    let isSelected = Calendar.current.isDate(day, inSameDayAs: viewModel.selectedDate)
-                    let isVisible = isDayVisibleInTimeline(index: index)
-                    let apptCount = viewModel.appointments(for: day).count
-                    let dayNum = Calendar.current.component(.day, from: day)
-                    let dayLetter = shortSingleLetterDay(for: day)
-                    
-                    Button {
-                        Haptics.play(.selection)
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            viewModel.selectedDate = day
-                        }
-                    } label: {
-                        VStack(spacing: 2) {
-                            Text(dayLetter)
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(isToday ? Color.red : Color.secondary)
-                            
-                            ZStack {
-                                if isToday {
-                                    Circle()
-                                        .fill(Color.red)
-                                        .frame(width: 22, height: 22)
-                                } else if isSelected {
-                                    Circle()
-                                        .fill(Color.blue.opacity(0.18))
-                                        .frame(width: 22, height: 22)
+            GeometryReader { stripGeo in
+                let pageWidth = max(100, stripGeo.size.width - 6)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(spacing: 0) {
+                        ForEach(timelineWeekMondays, id: \.self) { monday in
+                            let days = daysOfWeek(starting: monday)
+                            HStack(spacing: 0) {
+                                ForEach(days, id: \.self) { day in
+                                    let isToday = Calendar.current.isDateInToday(day)
+                                    let isSelected = Calendar.current.isDate(day, inSameDayAs: viewModel.selectedDate)
+                                    let isVisible = isDayVisibleInTimeline(day: day)
+                                    let apptCount = viewModel.appointments(for: day).count
+                                    let dayNum = Calendar.current.component(.day, from: day)
+                                    let dayLetter = shortSingleLetterDay(for: day)
+                                    
+                                    Button {
+                                        Haptics.play(.selection)
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                            viewModel.selectedDate = day
+                                        }
+                                    } label: {
+                                        VStack(spacing: 2) {
+                                            Text(dayLetter)
+                                                .font(.system(size: 10, weight: .bold))
+                                                .foregroundStyle(isToday ? Color.red : Color.secondary)
+                                            
+                                            ZStack {
+                                                if isToday {
+                                                    Circle()
+                                                        .fill(Color.red)
+                                                        .frame(width: 22, height: 22)
+                                                } else if isSelected {
+                                                    Circle()
+                                                        .fill(Color.blue.opacity(0.18))
+                                                        .frame(width: 22, height: 22)
+                                                }
+                                                
+                                                Text("\(dayNum)")
+                                                    .font(.system(size: 12, weight: isToday || isSelected ? .bold : .medium))
+                                                    .foregroundStyle(isToday ? Color.white : (isSelected ? Color.blue : Color.primary))
+                                            }
+                                            .frame(height: 22)
+                                            
+                                            // Indicator dot
+                                            Circle()
+                                                .fill(apptCount > 0 ? (isToday ? Color.red : Color.blue) : Color.clear)
+                                                .frame(width: 4, height: 4)
+                                        }
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 3)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 8)
+                                                .fill(isVisible ? Color.secondary.opacity(0.08) : Color.clear)
+                                        )
+                                        .contentShape(Rectangle())
+                                    }
+                                    .buttonStyle(.plain)
                                 }
-                                
-                                Text("\(dayNum)")
-                                    .font(.system(size: 12, weight: isToday || isSelected ? .bold : .medium))
-                                    .foregroundStyle(isToday ? Color.white : (isSelected ? Color.blue : Color.primary))
                             }
-                            .frame(height: 22)
-                            
-                            // Indicator dot
-                            Circle()
-                                .fill(apptCount > 0 ? (isToday ? Color.red : Color.blue) : Color.clear)
-                                .frame(width: 4, height: 4)
+                            .frame(width: pageWidth)
+                            .id(monday)
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 3)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(isVisible ? Color.secondary.opacity(0.08) : Color.clear)
-                        )
-                        .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                    .scrollTargetLayout()
                 }
+                .scrollTargetBehavior(.paging)
+                .scrollPosition(id: $miniStripWeekID, anchor: .leading)
+                .padding(.trailing, 6)
             }
-            .padding(.trailing, 6)
+            .frame(height: 48)
         }
         .padding(.bottom, 4)
     }
@@ -369,19 +448,53 @@ struct AppointmentWeekView: View {
             // Vertical Separator
             verticalSeparator
             
-            // Day Headers HStack (offset smoothly by -scrollOffsetX in scrollable modes!)
-            HStack(spacing: 0) {
-                ForEach(Array(viewModel.currentWeekDays.enumerated()), id: \.element) { index, day in
-                    dayHeaderCell(for: day, index: index, width: colWidth)
-                        .frame(width: colWidth, height: headerHeight)
-                    
-                    // Separator after each header cell
-                    verticalSeparator
+            // Synchronized sliding window of Day Headers (pixel-exact with scrollOffsetX)
+            if densityMode == .fullWeek {
+                let weeks = timelineWeekMondays
+                let pageWidth = max(1, availableWidth)
+                let currentPage = max(0, min(weeks.count - 1, Int(floor(scrollOffsetX / pageWidth))))
+                let startPage = max(0, currentPage - 1)
+                let endPage = min(weeks.count - 1, currentPage + 1)
+                
+                ZStack(alignment: .leading) {
+                    ForEach(startPage...endPage, id: \.self) { pageIdx in
+                        let weekDays = daysOfWeek(starting: weeks[pageIdx])
+                        HStack(spacing: 0) {
+                            ForEach(Array(weekDays.enumerated()), id: \.element) { idx, day in
+                                dayHeaderCell(for: day, index: idx, width: colWidth)
+                                    .frame(width: colWidth, height: headerHeight)
+                                if idx < weekDays.count - 1 {
+                                    verticalSeparator
+                                }
+                            }
+                        }
+                        .frame(width: availableWidth, height: headerHeight, alignment: .leading)
+                        .offset(x: CGFloat(pageIdx) * availableWidth - scrollOffsetX)
+                    }
                 }
+                .frame(width: availableWidth, height: headerHeight, alignment: .leading)
+                .clipped()
+            } else {
+                let days = timelineDays
+                let stepWidth = max(1, colWidth + separatorWidth)
+                let firstIdx = max(0, min(days.count - 1, Int(floor(scrollOffsetX / stepWidth))))
+                let startIdx = max(0, firstIdx - 1)
+                let endIdx = min(days.count - 1, firstIdx + densityMode.visibleDaysCount + 1)
+                
+                ZStack(alignment: .leading) {
+                    ForEach(startIdx...endIdx, id: \.self) { idx in
+                        let day = days[idx]
+                        HStack(spacing: 0) {
+                            dayHeaderCell(for: day, index: idx, width: colWidth)
+                                .frame(width: colWidth, height: headerHeight)
+                            verticalSeparator
+                        }
+                        .offset(x: CGFloat(idx) * stepWidth - scrollOffsetX)
+                    }
+                }
+                .frame(width: availableWidth, height: headerHeight, alignment: .leading)
+                .clipped()
             }
-            .offset(x: -scrollOffsetX)
-            .frame(width: availableWidth, alignment: .leading)
-            .clipped()
         }
         .frame(height: headerHeight)
     }
@@ -511,16 +624,37 @@ struct AppointmentWeekView: View {
         }
     }
     
-    // MARK: - Days Columns Content HStack
-    private func daysColumnsContent(colWidth: CGFloat) -> some View {
-        HStack(alignment: .top, spacing: 0) {
-            ForEach(Array(viewModel.currentWeekDays.enumerated()), id: \.element) { index, day in
-                dayColumnView(day: day, index: index, width: colWidth)
-                    .frame(width: colWidth)
-                    .id(Calendar.current.startOfDay(for: day))
-                
-                // Vertical Separator after each column
-                verticalSeparator
+    // MARK: - Continuous Multi-Week Day Columns (2gg / 5gg)
+    private func continuousDaysContent(colWidth: CGFloat) -> some View {
+        let days = timelineDays
+        return LazyHStack(alignment: .top, spacing: 0) {
+            ForEach(Array(days.enumerated()), id: \.element) { index, day in
+                HStack(spacing: 0) {
+                    dayColumnView(day: day, index: index, width: colWidth)
+                        .frame(width: colWidth)
+                    verticalSeparator
+                }
+                .id(day)
+            }
+        }
+    }
+
+    // MARK: - Full Week Pages Content (7gg Paging)
+    private func fullWeekPagesContent(colWidth: CGFloat, pageWidth: CGFloat) -> some View {
+        LazyHStack(alignment: .top, spacing: 0) {
+            ForEach(timelineWeekMondays, id: \.self) { monday in
+                let weekDays = daysOfWeek(starting: monday)
+                HStack(alignment: .top, spacing: 0) {
+                    ForEach(Array(weekDays.enumerated()), id: \.element) { index, day in
+                        dayColumnView(day: day, index: index, width: colWidth)
+                            .frame(width: colWidth)
+                        if index < weekDays.count - 1 {
+                            verticalSeparator
+                        }
+                    }
+                }
+                .frame(width: pageWidth, alignment: .leading)
+                .id(monday)
             }
         }
     }
@@ -719,53 +853,87 @@ struct AppointmentWeekView: View {
         .frame(height: totalGridHeight)
     }
     
-    // MARK: - Week Swipe Gestures
-    private var weekSwipeGesture: some Gesture {
-        DragGesture(minimumDistance: 24, coordinateSpace: .local)
-            .onEnded { value in
-                let dx = value.translation.width
-                let dy = value.translation.height
-                guard abs(dx) > 45, abs(dx) > abs(dy) * 1.4 else { return }
-                triggerWeekSwipe(direction: dx < 0 ? 1 : -1)
+    // MARK: - Native Scroll Synchronization
+    private func syncScrollToSelectedDate(animated: Bool) {
+        let targetDay = Self.startOfDay(viewModel.selectedDate)
+        let targetMonday = Self.mondayOfWeek(containing: targetDay)
+        
+        // Recenter 25-week timeline if navigated close to the buffer edge (> 9 weeks away)
+        let daysFromAnchor = Calendar.current.dateComponents([.day], from: anchorMonday, to: targetMonday).day ?? 0
+        if abs(daysFromAnchor) > (weeksRadius - 3) * 7 {
+            anchorMonday = targetMonday
+        }
+        
+        let apply = {
+            if miniStripWeekID != targetMonday {
+                miniStripWeekID = targetMonday
             }
-    }
-
-    private var fullWeekGridSwipeGesture: some Gesture {
-        DragGesture(minimumDistance: 24, coordinateSpace: .local)
-            .onEnded { value in
-                guard densityMode == .fullWeek else { return }
-                let dx = value.translation.width
-                let dy = value.translation.height
-                guard abs(dx) > 50, abs(dx) > abs(dy) * 1.4 else { return }
-                triggerWeekSwipe(direction: dx < 0 ? 1 : -1)
-            }
-    }
-
-    private func triggerWeekSwipe(direction: Int, landOnEdge: Bool = false) {
-        let now = Date()
-        guard now.timeIntervalSince(lastWeekSwipeDate) > 0.55 else { return }
-        lastWeekSwipeDate = now
-        Haptics.play(.selection)
-
-        withAnimation(.easeInOut(duration: 0.22)) {
-            if landOnEdge {
-                var cal = Calendar(identifier: .gregorian)
-                cal.firstWeekday = 2
-                let currentMonday = viewModel.currentWeekMonday
-                if direction > 0 {
-                    if let nextMonday = cal.date(byAdding: .day, value: 7, to: currentMonday) {
-                        viewModel.selectedDate = nextMonday
-                    }
-                } else {
-                    let dayOffset = max(0, 7 - densityMode.visibleDaysCount)
-                    if let prevMonday = cal.date(byAdding: .day, value: -7, to: currentMonday),
-                       let target = cal.date(byAdding: .day, value: dayOffset, to: prevMonday) {
-                        viewModel.selectedDate = target
-                    }
+            if densityMode == .fullWeek {
+                if scrolledWeekID != targetMonday {
+                    scrolledWeekID = targetMonday
                 }
             } else {
-                viewModel.changeWeek(by: direction)
+                if scrolledDayID != targetDay {
+                    scrolledDayID = targetDay
+                }
             }
+        }
+        
+        if animated {
+            withAnimation(.easeInOut(duration: 0.25)) {
+                apply()
+            }
+        } else {
+            apply()
+        }
+    }
+
+    private func handleScrolledDayChanged(_ newDay: Date?) {
+        guard let newDay, densityMode != .fullWeek else { return }
+        let normalizedNew = Self.startOfDay(newDay)
+        let newMonday = Self.mondayOfWeek(containing: normalizedNew)
+        
+        if miniStripWeekID != newMonday {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                miniStripWeekID = newMonday
+            }
+        }
+        
+        let currentSelected = Self.startOfDay(viewModel.selectedDate)
+        let lastVisible = Calendar.current.date(byAdding: .day, value: densityMode.visibleDaysCount - 1, to: normalizedNew) ?? normalizedNew
+        if currentSelected < normalizedNew || currentSelected > lastVisible {
+            lastScrollDrivenDate = normalizedNew
+            viewModel.selectedDate = normalizedNew
+        }
+    }
+
+    private func handleScrolledWeekChanged(_ newMonday: Date?) {
+        guard let newMonday, densityMode == .fullWeek else { return }
+        let normalizedMonday = Self.startOfDay(newMonday)
+        
+        if miniStripWeekID != normalizedMonday {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                miniStripWeekID = normalizedMonday
+            }
+        }
+        
+        let currentMonday = Self.mondayOfWeek(containing: viewModel.selectedDate)
+        if currentMonday != normalizedMonday {
+            let weekdayOffset = Calendar.current.dateComponents([.day], from: currentMonday, to: Self.startOfDay(viewModel.selectedDate)).day ?? 0
+            let target = Calendar.current.date(byAdding: .day, value: max(0, min(6, weekdayOffset)), to: normalizedMonday) ?? normalizedMonday
+            lastScrollDrivenDate = target
+            viewModel.selectedDate = target
+        }
+    }
+
+    private func handleMiniStripWeekChanged(_ newMonday: Date?) {
+        guard let newMonday else { return }
+        let normalizedMonday = Self.startOfDay(newMonday)
+        let currentMonday = Self.mondayOfWeek(containing: viewModel.selectedDate)
+        if currentMonday != normalizedMonday {
+            let weekdayOffset = Calendar.current.dateComponents([.day], from: currentMonday, to: Self.startOfDay(viewModel.selectedDate)).day ?? 0
+            let target = Calendar.current.date(byAdding: .day, value: max(0, min(6, weekdayOffset)), to: normalizedMonday) ?? normalizedMonday
+            viewModel.selectedDate = target
         }
     }
     
@@ -798,15 +966,6 @@ struct AppointmentWeekView: View {
         onAddAppointment?(targetDate, targetDate)
     }
     
-    private func scrollToSelectedDay(proxy: ScrollViewProxy) {
-        let startOfDay = Calendar.current.startOfDay(for: viewModel.selectedDate)
-        Task { @MainActor in
-            withAnimation(.easeInOut(duration: 0.25)) {
-                proxy.scrollTo(startOfDay, anchor: .leading)
-            }
-        }
-    }
-    
     // Cached formatters to eliminate repeated allocations
     private static let monthYearFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -830,22 +989,23 @@ struct AppointmentWeekView: View {
     }()
 
     private var monthYearTitle: String {
-        Self.monthYearFormatter.string(from: viewModel.currentWeekMonday).capitalized
+        Self.monthYearFormatter.string(from: viewModel.selectedDate).capitalized
     }
     
-    private func isDayVisibleInTimeline(index: Int) -> Bool {
-        let visibleCount = densityMode.visibleDaysCount
-        if visibleCount >= 7 {
-            return true
+    private func isDayVisibleInTimeline(day: Date) -> Bool {
+        if densityMode == .fullWeek {
+            return false
         }
+        let days = timelineDays
+        guard !days.isEmpty else { return false }
         let availableWidth = max(100, timelineWidth - timeColWidth - separatorWidth)
-        let colCount = CGFloat(visibleCount)
+        let colCount = CGFloat(densityMode.visibleDaysCount)
         let colWidth = floor((availableWidth - separatorWidth * (colCount - 1)) / colCount)
-        let step = colWidth + separatorWidth
-        guard step > 0 else { return index < visibleCount }
-        let maxFirstIndex = max(0, 7 - visibleCount)
-        let firstIndex = max(0, min(maxFirstIndex, Int(round(scrollOffsetX / step))))
-        return index >= firstIndex && index < firstIndex + visibleCount
+        let step = max(1, colWidth + separatorWidth)
+        let firstIdx = max(0, min(days.count - 1, Int(round(scrollOffsetX / step))))
+        let endIdx = min(days.count - 1, firstIdx + densityMode.visibleDaysCount - 1)
+        let target = Self.startOfDay(day)
+        return target >= days[firstIdx] && target <= days[endIdx]
     }
     
     /// High-contrast alternating background between adjacent days

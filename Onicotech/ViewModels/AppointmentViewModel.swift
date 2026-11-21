@@ -24,12 +24,14 @@ class AppointmentViewModel {
     private(set) var appointmentsByDate: [String: [Appointment]] = [:]
     
     var isLoading = false
+    var hasLoadedOnce = false
     var errorMessage: String?
     var showError = false
     var selectedDate: Date = .now
     var viewMode: AppointmentViewMode = .week
     
     private let api = APIClient.shared
+    private var lastLoadedSalonId: UUID?
     
     // Cached formatters to eliminate repeated allocations
     private static let isoDateFormatter: DateFormatter = {
@@ -136,13 +138,39 @@ class AppointmentViewModel {
     func loadAppointments(salonId: UUID? = nil) async {
         isLoading = true
         errorMessage = nil
+        let salonChanged = (salonId != lastLoadedSalonId)
         do {
             if viewMode == .week {
-                let range = currentWeekRangeStrings
-                appointments = try await api.getAppointments(startDate: range.start, endDate: range.end, salonId: salonId)
+                // Fetch a 3-week sliding window (prev + current + next week)
+                // so swiping continuously between weeks always shows events immediately.
+                var cal = Calendar(identifier: .gregorian)
+                cal.firstWeekday = 2
+                let windowStartDate = cal.date(byAdding: .day, value: -7, to: currentWeekMonday) ?? currentWeekMonday
+                let windowEndDate = cal.date(byAdding: .day, value: 7, to: currentWeekSunday) ?? currentWeekSunday
+                let startStr = Self.isoDateFormatter.string(from: windowStartDate)
+                let endStr = Self.isoDateFormatter.string(from: windowEndDate)
+                
+                let fetched = try await api.getAppointments(startDate: startStr, endDate: endStr, salonId: salonId)
+                if salonChanged || appointments.isEmpty {
+                    appointments = fetched
+                } else {
+                    // Merge: replace entries inside the fetched window while preserving adjacent cached weeks
+                    let keepStart = Self.isoDateFormatter.string(from: cal.date(byAdding: .day, value: -45, to: currentWeekMonday) ?? windowStartDate)
+                    let keepEnd = Self.isoDateFormatter.string(from: cal.date(byAdding: .day, value: 45, to: currentWeekSunday) ?? windowEndDate)
+                    let fetchedIds = Set(fetched.compactMap(\.id))
+                    let preserved = appointments.filter { appt in
+                        guard appt.date >= keepStart && appt.date <= keepEnd else { return false }
+                        if appt.date >= startStr && appt.date <= endStr { return false }
+                        if let id = appt.id, fetchedIds.contains(id) { return false }
+                        return true
+                    }
+                    appointments = preserved + fetched
+                }
             } else {
                 appointments = try await api.getAppointments(date: selectedDateString, salonId: salonId)
             }
+            lastLoadedSalonId = salonId
+            hasLoadedOnce = true
             // Update widget schedule with upcoming appointments
             updateWidgetSchedule(with: appointments)
         } catch {
