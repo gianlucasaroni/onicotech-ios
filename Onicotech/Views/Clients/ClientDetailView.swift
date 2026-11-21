@@ -30,13 +30,14 @@ struct ClientDetailView: View {
     @State private var showingEditSheet = false
     @State private var showingDeleteAlert = false
     @State private var isDeleting = false
-    @Environment(\.dismiss) private var dismiss
     @State private var photos: [Photo] = []
     @State private var selectedPhoto: Photo?
     @State private var showingAddAppointmentSheet = false
     @State private var selectedAppointment: Appointment?
     @State private var appointmentViewModel = AppointmentViewModel()
     @State private var allPromotions: [Promotion] = []
+    @State private var nailPhotos: [Photo] = []
+    @State private var isLoadingNailPhotos = false
     
     private var filteredAppointments: [Appointment] {
         let today = currentDateString()
@@ -44,7 +45,7 @@ struct ClientDetailView: View {
         case .upcoming:
             return appointments
                 .filter { $0.date >= today && $0.status != .cancelled }
-                .sorted { ($0.date, $0.startTime) < ($1.date, $1.startTime) }
+                .sorted { ($0.date, $0.startTime) < ($1.date, $0.startTime) }
         case .past:
             return appointments
                 .filter { $0.date < today }
@@ -62,6 +63,16 @@ struct ClientDetailView: View {
         case "super puntuale", "puntuale": return .blue
         case "esigente": return .indigo
         default: return .secondary
+        }
+    }
+    
+    private var filteredNailPhotos: [Photo] {
+        let today = currentDateString()
+        // Show upcoming nail appointment photos only
+        return nailPhotos.filter { photo in
+            guard let appointmentId = photo.appointmentId else { return true }
+            // If we have appointments, filter by those with dates >= today
+            return appointments.isEmpty || appointments.contains { $0.id?.uuidString == appointmentId }
         }
     }
     
@@ -228,11 +239,28 @@ struct ClientDetailView: View {
                 }
             }
             
-            Section("Galleria") {
-                PhotoHorizontalList(photos: photos, onPhotoSelected: { photo in
-                    selectedPhoto = photo
-                })
+            // Nail Photo Timeline / Gallery Section
+            Section("Timeline Foto Unghie") {
+                if filteredNailPhotos.isEmpty {
+                    if nailPhotos.isEmpty {
+                        ContentUnavailableView(
+                            "Nessuna foto appuntamento",
+                            systemImage: "photo.on.rectangle.angled",
+                            description: Text("Non ci sono foto di trattamenti per questo cliente")
+                        )
+                        .frame(minHeight: 150)
+                    } else {
+                        // Photos exist but none match current filter
+                        PhotoHorizontalList(photos: nailPhotos, onPhotoSelected: { photo in
+                            selectedPhoto = photo
+                        })
+                    }
+                } else {
+                    // Show the timeline/tiled view with filtered photos
+                    TimelineGalleryView(photos: filteredNailPhotos)
+                }
             }
+            .listRowBackground(Color.secondary.opacity(0.03))
             
             // Filter picker + appointments
             Section {
@@ -316,15 +344,15 @@ struct ClientDetailView: View {
         } message: {
             Text("Sei sicura di voler eliminare definitivamente \(client.fullName)?")
         }
-        #if os(iOS)
+#if os(iOS)
         .fullScreenCover(item: $selectedPhoto) { photo in
             FullscreenPhotoViewer(photos: photos, initialPhoto: photo, title: "Galleria Cliente")
         }
-        #else
+#else
         .sheet(item: $selectedPhoto) { photo in
             FullscreenPhotoViewer(photos: photos, initialPhoto: photo, title: "Galleria Cliente")
         }
-        #endif
+#endif
         .sheet(isPresented: $showingAddAppointmentSheet) {
             Task { await loadAppointments() }
         } content: {
@@ -348,12 +376,14 @@ struct ClientDetailView: View {
             await loadAppointments()
             await loadPhotos()
             await loadPromotions()
+            await loadNailPhotos()
             Haptics.play(.success)
         }
         .task {
             await loadAppointments()
             await loadPhotos()
             await loadPromotions()
+            await loadNailPhotos()
         }
     }
     
@@ -401,6 +431,19 @@ struct ClientDetailView: View {
         }
     }
     
+    private func loadNailPhotos() async {
+        isLoadingNailPhotos = true
+        do {
+            guard let clientId = client.id else { return }
+            nailPhotos = try await APIClient.shared.getClientNailPhotos(clientId: clientId)
+            // Also reset loading flag if needed
+        } catch {
+            print("Error loading nail photos: \(error)")
+            nailPhotos = []
+        }
+        isLoadingNailPhotos = false
+    }
+    
     private func currentDateString() -> String {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd"
@@ -408,7 +451,105 @@ struct ClientDetailView: View {
     }
 }
 
-// Compact row for client detail list
+// MARK: - Timeline Gallery View
+struct TimelineGalleryView: View {
+    let photos: [Photo]
+    
+    @State private var showingFullscreen = false
+    @State private var selectedPhoto: Photo?
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Date/header info
+            HStack {
+                Image(systemName: "photo.on.rectangle")
+                    .font(.caption)
+                    .foregroundStyle(.blue)
+                
+                Text("\(photos.count) foto appuntamento")
+                    .font(.subheadline.bold())
+                    .foregroundStyle(.primary)
+                
+                Spacer()
+            }
+            
+            // Photo grid in 2 columns
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 80))], spacing: 10) {
+                ForEach(photos) { photo in
+                    VStack(alignment: .center, spacing: 6) {
+                        KFImage(URL(string: photo.thumbnailUrl))
+                            .placeholder {
+                                Rectangle()
+                                    .fill(Color.gray.opacity(0.1))
+                                    .aspectRatio(1, contentMode: .fill)
+                            }
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 80, height: 80)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        
+                        // Type badge
+                        HStack {
+                            Image(systemName: badgeIconForType(photo.type))
+                                .font(.system(size: 10))
+                                .foregroundStyle(.white)
+                                .padding(4)
+                                .background(Color.black.opacity(0.6))
+                                .clipShape(Circle())
+                            Text(typeLabel(photo.type))
+                                .font(.system(size: 8))
+                                .fontWeight(.medium)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
+                        .background(Color.blue.opacity(0.1))
+                        .clipShape(Capsule())
+                    }
+                    .onTapGesture {
+                        selectedPhoto = photo
+                    }
+                    .contextMenu {
+                        Button {
+                            selectedPhoto = photo
+                        } label: {
+                            Label("Visualizza Dettagli", systemImage: "info.circle")
+                        }
+                    }
+                }
+            }
+        }
+        .padding(10)
+        .background(Color.secondary.opacity(0.05))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .sheet(item: $selectedPhoto) { photo in
+            FullscreenPhotoViewer(
+                photos: photos,
+                initialPhoto: photo,
+                title: "Foto Unghie"
+            )
+        }
+    }
+    
+    private func typeLabel(_ type: String) -> String {
+        switch type.lowercased() {
+        case "before": return "Prima"
+        case "after": return "Dopo"
+        default: return "Altro"
+        }
+    }
+    
+    private func badgeIconForType(_ type: String) -> String {
+        switch type.lowercased() {
+        case "before": return "arrow.left.circle.fill"
+        case "after": return "arrow.right.circle.fill"
+        default: return "photo.fill"
+        }
+    }
+}
+
+// MARK: - Compact row for client detail list
 struct AppointmentRowCompact: View {
     let appointment: Appointment
     
@@ -484,5 +625,24 @@ struct AppointmentRowCompact: View {
         let components = appointment.date.split(separator: "-")
         guard components.count == 3, let m = Int(components[1]), m >= 1, m <= 12 else { return "" }
         return months[m]
+    }
+}
+
+// MARK: - Preview
+#Preview {
+    NavigationStack {
+        ClientDetailView(
+            client: Client(
+                firstName: "Mario",
+                lastName: "Rossi",
+                nailType: "Standard / Naturale",
+                allergies: "HEMA-Free, Acrilati",
+                preferredShape: "Mandorla",
+                technicalNotes: "Base coat: OPI Natural Nail Base Coat\nBuilder: IBD Builder Gel Clear\nColore: OPI Bubble Bath",
+                customerTag: "Fedele"
+            ),
+            clientViewModel: ClientViewModel()
+        )
+        .navigationTitle("Scheda Cliente")
     }
 }
