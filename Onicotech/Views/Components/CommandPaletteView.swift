@@ -536,6 +536,14 @@ extension DateFormatter {
         f.timeZone = TimeZone(secondsFromGMT: 0)
         return f
     }()
+    
+    static let timeOnly: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.calendar = Calendar(identifier: .gregorian)
+        return f
+    }()
 }
 
 // MARK: - Preview

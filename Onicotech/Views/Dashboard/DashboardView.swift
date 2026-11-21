@@ -225,6 +225,7 @@ struct StatCard: View {
 
 struct NextFreeSlotWidget: View {
     let slot: NextFreeSlot
+    @State private var showAppointmentForm = false
     
     var body: some View {
         HStack(spacing: 14) {
@@ -266,15 +267,30 @@ struct NextFreeSlotWidget: View {
             
             Spacer()
             
-            NavigationLink(destination: AppointmentListView()) {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .padding(8)
-                    .background(Color.secondary.opacity(0.1))
-                    .clipShape(Circle())
+            Button {
+                Haptics.play(.light)
+                showAppointmentForm = true
+            } label: {
+                HStack(spacing: 6) {
+                    Text("Prenota")
+                        .font(.subheadline.weight(.semibold))
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(Color.green)
+                .clipShape(Capsule())
             }
             .buttonStyle(.plain)
+            .sheet(isPresented: $showAppointmentForm) {
+                AppointmentFormView(
+                    viewModel: AppointmentViewModel(),
+                    preselectedDate: DateFormatter.iso8601DateOnly.date(from: slot.date) ?? Date(),
+                    preselectedTime: DateFormatter.timeOnly.date(from: slot.startTime)
+                )
+            }
         }
         .padding(16)
         .background(Color.systemBackgroundCompat)

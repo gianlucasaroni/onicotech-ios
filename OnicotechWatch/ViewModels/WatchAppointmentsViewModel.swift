@@ -4,6 +4,10 @@ import Combine
 #if canImport(WatchKit)
 import WatchKit
 #endif
+#if canImport(WidgetKit)
+import WidgetKit
+#endif
+import OnicotechWatchShared
 
 @MainActor
 final class WatchAppointmentsViewModel: ObservableObject {
@@ -76,6 +80,8 @@ final class WatchAppointmentsViewModel: ObservableObject {
             self.appointments = fetched
             self.lastRefresh = Date()
             self.isLoading = false
+            // Update widget schedule with upcoming appointments
+            updateWidgetSchedule(with: fetched)
             #if canImport(WatchKit)
             WKInterfaceDevice.current().play(.click)
             #endif
@@ -83,6 +89,34 @@ final class WatchAppointmentsViewModel: ObservableObject {
             self.errorMessage = error.localizedDescription
             self.isLoading = false
         }
+    }
+    
+    private func updateWidgetSchedule(with appointments: [WatchAppointment]) {
+        let now = Date()
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        
+        let upcoming = appointments
+            .filter { !$0.isCompleted && !$0.isCancelled }
+            .compactMap { apt -> Date? in
+                let dateString = "\(apt.date) \(apt.startTime)"
+                let aptFormatter = DateFormatter()
+                aptFormatter.dateFormat = "yyyy-MM-dd HH:mm"
+                return aptFormatter.date(from: dateString)
+            }
+            .filter { $0 > now }
+            .sorted()
+        
+        let schedule = AppointmentSchedule(
+            starts: upcoming,
+            expires: Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: now)) ?? now.addingTimeInterval(86400)
+        )
+        AppointmentSchedule.replace(with: schedule)
+        
+        // Request widget reload
+        #if canImport(WidgetKit)
+        WidgetCenter.shared.reloadTimelines(ofKind: AppointmentSchedule.widgetKind)
+        #endif
     }
     
     func markCompleted(id: UUID) {
