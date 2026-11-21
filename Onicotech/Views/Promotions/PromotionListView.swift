@@ -90,25 +90,8 @@ struct PromotionListView: View {
     }
     
     private func configureCommandPalette() {
-        let clientVM = ClientViewModel()
-        let appointmentVM = AppointmentViewModel()
-        let productVM = ProductViewModel()
-        let expenseVM = ExpenseViewModel()
-        
-        commandPaletteState.configure(
-            clientVM: clientVM,
-            appointmentVM: appointmentVM,
-            productVM: productVM,
-            expenseVM: expenseVM,
-            promotionVM: viewModel,
-            salonManager: salonManager
-        )
-        
-        commandPaletteState.onNavigatePromotions = { search in
-            if let search = search {
-                // Add search functionality here
-            }
-        }
+        commandPaletteState?.setSalonManager(salonManager)
+        commandPaletteState?.updatePromotions(viewModel.promotions)
     }
 }
 

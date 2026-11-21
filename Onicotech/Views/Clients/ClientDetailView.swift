@@ -1,4 +1,5 @@
 import SwiftUI
+import Kingfisher
 
 enum AppointmentFilter: String, CaseIterable {
     case upcoming = "Prossimi"
@@ -30,6 +31,7 @@ struct ClientDetailView: View {
     @State private var showingEditSheet = false
     @State private var showingDeleteAlert = false
     @State private var isDeleting = false
+    @Environment(\.dismiss) private var dismiss
     @State private var photos: [Photo] = []
     @State private var selectedPhoto: Photo?
     @State private var showingAddAppointmentSheet = false
@@ -67,13 +69,11 @@ struct ClientDetailView: View {
     }
     
     private var filteredNailPhotos: [Photo] {
-        let today = currentDateString()
-        // Show upcoming nail appointment photos only
-        return nailPhotos.filter { photo in
-            guard let appointmentId = photo.appointmentId else { return true }
-            // If we have appointments, filter by those with dates >= today
-            return appointments.isEmpty || appointments.contains { $0.id?.uuidString == appointmentId }
-        }
+        return nailPhotos
+            .filter { photo in
+                appointments.isEmpty || appointments.contains { $0.id == photo.appointmentId }
+            }
+            .sorted { $0.createdAt > $1.createdAt }
     }
     
     var body: some View {

@@ -624,8 +624,7 @@ final class APIClient {
     }
     
     func getClientNailPhotos(clientId: UUID) async throws -> [Photo] {
-        let response: APIResponse<[Photo]> = try await request(path: "/clients/\(clientId.uuidString)/nail-photos")
-        return response.data ?? []
+        return try await getClientPhotos(clientId: clientId)
     }
     
     // MARK: - Expenses

@@ -1,5 +1,5 @@
 import SwiftUI
-import Combine
+import Observation
 
 // MARK: - Command Palette Item
 
@@ -39,15 +39,15 @@ final class CommandPaletteState {
     var searchText = ""
     private var items: [CommandPaletteItem] = []
     
-    // ViewModels (set during configuration)
-    private weak var clientVM: ClientViewModel?
-    private weak var appointmentVM: AppointmentViewModel?
-    private weak var productVM: ProductViewModel?
-    private weak var expenseVM: ExpenseViewModel?
-    private weak var promotionVM: PromotionViewModel?
+    // Cached data snapshots for global search
+    private var clients: [Client] = []
+    private var appointments: [Appointment] = []
+    private var products: [Product] = []
+    private var expenses: [Expense] = []
+    private var promotions: [Promotion] = []
     private weak var salonManager: SalonManager?
     
-    // Navigation actions (set by app)
+    // Navigation & quick actions
     var onNewAppointment: (() -> Void)?
     var onNewClient: (() -> Void)?
     var onNewSale: (() -> Void)?
@@ -68,26 +68,65 @@ final class CommandPaletteState {
         case hours, staff, booking, system
     }
     
-    func configure(
-        clientVM: ClientViewModel,
-        appointmentVM: AppointmentViewModel,
-        productVM: ProductViewModel,
-        expenseVM: ExpenseViewModel,
-        promotionVM: PromotionViewModel,
-        salonManager: SalonManager
-    ) {
-        self.clientVM = clientVM
-        self.appointmentVM = appointmentVM
-        self.productVM = productVM
-        self.expenseVM = expenseVM
-        self.promotionVM = promotionVM
-        self.salonManager = salonManager
+    func setSalonManager(_ manager: SalonManager) {
+        self.salonManager = manager
+        rebuildItems()
+    }
+    
+    func updateClients(_ clients: [Client]) {
+        self.clients = clients
+        rebuildItems()
+    }
+    
+    func updateAppointments(_ appointments: [Appointment]) {
+        self.appointments = appointments
+        rebuildItems()
+    }
+    
+    func updateProducts(_ products: [Product]) {
+        self.products = products
+        rebuildItems()
+    }
+    
+    func updateExpenses(_ expenses: [Expense]) {
+        self.expenses = expenses
+        rebuildItems()
+    }
+    
+    func updatePromotions(_ promotions: [Promotion]) {
+        self.promotions = promotions
+        rebuildItems()
+    }
+    
+    func loadAllData() async {
+        let salonId = salonManager?.selectedSalonId
+        let isOwner = salonManager?.isOwner ?? true
+        let today = Date()
+        let startStr = DateFormatter.iso8601DateOnly.string(from: today)
+        let endDate = Calendar.current.date(byAdding: .day, value: 30, to: today) ?? today
+        let endStr = DateFormatter.iso8601DateOnly.string(from: endDate)
+        
+        async let fetchedClients: [Client]? = try? APIClient.shared.getClients()
+        async let fetchedAppointments: [Appointment]? = try? APIClient.shared.getAppointments(
+            startDate: startStr,
+            endDate: endStr,
+            salonId: salonId
+        )
+        async let fetchedProducts: [Product]? = try? APIClient.shared.getProducts(salonId: salonId)
+        async let fetchedPromotions: [Promotion]? = try? APIClient.shared.getPromotions(salonId: salonId)
+        async let fetchedExpenses: [Expense]? = isOwner ? (try? APIClient.shared.getExpenses(salonId: salonId)) : []
+        
+        if let c = await fetchedClients { clients = c }
+        if let a = await fetchedAppointments { appointments = a }
+        if let p = await fetchedProducts { products = p }
+        if let pr = await fetchedPromotions { promotions = pr }
+        if let e = await fetchedExpenses { expenses = e }
+        
         rebuildItems()
     }
     
     private func rebuildItems() {
-        guard salonManager?.selectedSalonId != nil else { return }
-        
+        let isOwner = salonManager?.isOwner ?? true
         var newItems: [CommandPaletteItem] = []
         
         // MARK: - Azioni Rapide
@@ -115,20 +154,19 @@ final class CommandPaletteState {
                 subtitle: "Aggiungi articolo, scorta e prezzo vendita",
                 systemImage: "shippingbox.fill",
                 category: .actions
-            ) { [weak self] in self?.onNewProduct?() },
-            CommandPaletteItem(
-                title: "Nuova Spesa / Uscita",
-                subtitle: "Registra spesa operativa, scontrino o fornitura",
-                systemImage: "creditcard.fill",
-                category: .actions
-            ) { [weak self] in self?.onNewExpense?() },
-            CommandPaletteItem(
-                title: "Inverti Tema Chiaro / Scuro",
-                subtitle: "Alterna istantaneamente la visualizzazione dark mode",
-                systemImage: "circle.lefthalf.filled",
-                category: .actions
-            ) { [weak self] in self?.onToggleTheme?() }
+            ) { [weak self] in self?.onNewProduct?() }
         ])
+        
+        if isOwner {
+            newItems.append(
+                CommandPaletteItem(
+                    title: "Nuova Spesa / Uscita",
+                    subtitle: "Registra spesa operativa, scontrino o fornitura",
+                    systemImage: "creditcard.fill",
+                    category: .actions
+                ) { [weak self] in self?.onNewExpense?() }
+            )
+        }
         
         // MARK: - Navigazione
         newItems.append(contentsOf: [
@@ -157,112 +195,118 @@ final class CommandPaletteState {
                 category: .navigation
             ) { [weak self] in self?.onNavigateProducts?(false, false, nil) },
             CommandPaletteItem(
-                title: "Spese & Uscite",
-                subtitle: "Registrazione spese operative",
-                systemImage: "creditcard",
-                category: .navigation
-            ) { [weak self] in self?.onNavigateExpenses?(false, nil) },
-            CommandPaletteItem(
-                title: "Statistiche & Incassi",
-                subtitle: "Fatturato, scontrino medio e trend",
-                systemImage: "chart.bar",
-                category: .navigation
-            ) { [weak self] in self?.onNavigateStatistics?() },
-            CommandPaletteItem(
-                title: "Fisco & Tasse (Forfettario)",
-                subtitle: "Stima tasse e contributi INPS",
-                systemImage: "eurosign.circle",
-                category: .navigation
-            ) { [weak self] in self?.onNavigateTaxes?() },
-            CommandPaletteItem(
                 title: "Promozioni & Offerte",
                 subtitle: "Gestisci sconti e voucher",
                 systemImage: "tag.fill",
                 category: .navigation
-            ) { [weak self] in self?.onNavigatePromotions?(nil) },
-            CommandPaletteItem(
-                title: "Orari di Apertura",
-                subtitle: "Configura fasce orarie e pause pranzo",
-                systemImage: "clock",
-                category: .navigation
-            ) { [weak self] in self?.onNavigateSettings?(.hours) },
-            CommandPaletteItem(
-                title: "Team & Collaboratrici",
-                subtitle: "Gestione operatrici e permessi",
-                systemImage: "person.2.badge.key.fill",
-                category: .navigation
-            ) { [weak self] in self?.onNavigateSettings?(.staff) },
-            CommandPaletteItem(
-                title: "Booking Online",
-                subtitle: "Link pubblico e impostazioni prenotazione",
-                systemImage: "globe",
-                category: .navigation
-            ) { [weak self] in self?.onNavigateSettings?(.booking) },
+            ) { [weak self] in self?.onNavigatePromotions?(nil) }
+        ])
+        
+        if isOwner {
+            newItems.append(contentsOf: [
+                CommandPaletteItem(
+                    title: "Spese & Uscite",
+                    subtitle: "Registrazione spese operative",
+                    systemImage: "creditcard",
+                    category: .navigation
+                ) { [weak self] in self?.onNavigateExpenses?(false, nil) },
+                CommandPaletteItem(
+                    title: "Statistiche & Incassi",
+                    subtitle: "Fatturato, scontrino medio e trend",
+                    systemImage: "chart.bar",
+                    category: .navigation
+                ) { [weak self] in self?.onNavigateStatistics?() },
+                CommandPaletteItem(
+                    title: "Fisco & Tasse (Forfettario)",
+                    subtitle: "Stima tasse e contributi INPS",
+                    systemImage: "eurosign.circle",
+                    category: .navigation
+                ) { [weak self] in self?.onNavigateTaxes?() },
+                CommandPaletteItem(
+                    title: "Orari di Apertura",
+                    subtitle: "Configura fasce orarie e pause pranzo",
+                    systemImage: "clock",
+                    category: .navigation
+                ) { [weak self] in self?.onNavigateSettings?(.hours) },
+                CommandPaletteItem(
+                    title: "Team & Collaboratrici",
+                    subtitle: "Gestione operatrici e permessi",
+                    systemImage: "person.2.badge.key.fill",
+                    category: .navigation
+                ) { [weak self] in self?.onNavigateSettings?(.staff) },
+                CommandPaletteItem(
+                    title: "Booking Online",
+                    subtitle: "Link pubblico e impostazioni prenotazione",
+                    systemImage: "globe",
+                    category: .navigation
+                ) { [weak self] in self?.onNavigateSettings?(.booking) }
+            ])
+        }
+        
+        newItems.append(
             CommandPaletteItem(
                 title: "Account & Impostazioni",
                 subtitle: "Profilo, sicurezza e sistema",
                 systemImage: "gear",
                 category: .navigation
             ) { [weak self] in self?.onNavigateSettings?(.system) }
-        ])
+        )
         
         // MARK: - Clienti
-        if let clients = clientVM?.clients {
-            for client in clients.prefix(10) {
-                newItems.append(CommandPaletteItem(
-                    title: client.fullName,
-                    subtitle: "📞 \(client.phone ?? "Nessun telefono")\(client.customerTag.map { " • Tag: \($0)" } ?? "")",
-                    systemImage: "person.circle",
-                    category: .clients
-                ) { [weak self] in
-                    self?.onNavigateClients?(client.fullName, client.id)
-                })
-            }
+        for client in clients.prefix(15) {
+            let tagPart = client.customerTag.map { " • Tag: \($0)" } ?? ""
+            newItems.append(CommandPaletteItem(
+                title: client.fullName,
+                subtitle: "📞 \(client.phone ?? "Nessun telefono")\(tagPart)",
+                systemImage: "person.circle",
+                category: .clients
+            ) { [weak self] in
+                self?.onNavigateClients?(client.fullName, client.id)
+            })
         }
         
         // MARK: - Appuntamenti
-        if let appointments = appointmentVM?.appointments {
-            let upcoming = appointments
-                .filter { $0.date >= DateFormatter.iso8601DateOnly.string(from: Date()) }
-                .sorted { ($0.date, $0.startTime) < ($1.date, $1.startTime) }
-                .prefix(10)
-            
-            for appt in upcoming {
-                let clientName = appt.clientName ?? "Cliente"
-                let services = appt.services?.map(\.name).joined(separator: ", ") ?? "Nessun servizio"
-                newItems.append(CommandPaletteItem(
-                    title: "\(clientName) • \(appt.date) \(appt.startTime)",
-                    subtitle: "\(services) • \(appt.status?.displayName ?? "Programmato")",
-                    systemImage: "calendar.badge.clock",
-                    category: .appointments
-                ) { [weak self] in
-                    self?.onNavigateAppointments?(clientName, appt.date)
-                })
-            }
+        let todayStr = DateFormatter.iso8601DateOnly.string(from: Date())
+        let upcoming = appointments
+            .filter { $0.date >= todayStr }
+            .sorted { ($0.date, $0.startTime) < ($1.date, $1.startTime) }
+            .prefix(10)
+        
+        for appt in upcoming {
+            let clientName = appt.client?.fullName ?? "Cliente"
+            let services = appt.services?.map(\.name).joined(separator: ", ") ?? "Nessun servizio"
+            newItems.append(CommandPaletteItem(
+                title: "\(clientName) • \(appt.date) \(appt.startTime)",
+                subtitle: "\(services) • \(appt.status?.displayName ?? "Programmato")",
+                systemImage: "calendar.badge.clock",
+                category: .appointments
+            ) { [weak self] in
+                self?.onNavigateAppointments?(clientName, appt.date)
+            })
         }
         
         // MARK: - Prodotti
-        if let products = productVM?.products {
-            for product in products.prefix(8) {
-                let stock = product.stock ?? 0
-                let stockLabel = stock <= 5 ? " ⚠️ Stock: \(stock)" : " 📦 \(stock)"
-                newItems.append(CommandPaletteItem(
-                    title: product.name,
-                    subtitle: "\(product.brand.map { "\($0) • " } ?? "")€\(String(format: "%.2f", Double(product.salePrice ?? 0) / 100))\(stockLabel)",
-                    systemImage: "shippingbox.fill",
-                    category: .products
-                ) { [weak self] in
-                    self?.onNavigateProducts?(false, false, product.name)
-                })
-            }
+        for product in products.prefix(10) {
+            let stock = product.totalStock ?? 0
+            let stockLabel = stock <= 5 ? " ⚠️ Stock: \(stock)" : " 📦 \(stock)"
+            let brandPrefix = product.brand.map { "\($0) • " } ?? ""
+            newItems.append(CommandPaletteItem(
+                title: product.name,
+                subtitle: "\(brandPrefix)€\(String(format: "%.2f", Double(product.price) / 100))\(stockLabel)",
+                systemImage: "shippingbox.fill",
+                category: .products
+            ) { [weak self] in
+                self?.onNavigateProducts?(false, false, product.name)
+            })
         }
         
         // MARK: - Spese (solo owner)
-        if salonManager?.activeRole == "owner", let expenses = expenseVM?.expenses {
-            for expense in expenses.prefix(5) {
+        if isOwner {
+            for expense in expenses.prefix(8) {
+                let salonPart = expense.salon.map { " • \($0.name)" } ?? ""
                 newItems.append(CommandPaletteItem(
                     title: expense.description,
-                    subtitle: "€\(String(format: "%.2f", Double(expense.amount) / 100)) • \(expense.category)\(expense.location.map { " • \($0)" } ?? "")",
+                    subtitle: "€\(String(format: "%.2f", Double(expense.amount) / 100)) • \(expense.category.displayName)\(salonPart)",
                     systemImage: "creditcard.fill",
                     category: .expenses
                 ) { [weak self] in
@@ -272,17 +316,21 @@ final class CommandPaletteState {
         }
         
         // MARK: - Promozioni
-        if let promotions = promotionVM?.promotions {
-            for promo in promotions.prefix(5) {
-                newItems.append(CommandPaletteItem(
-                    title: promo.name,
-                    subtitle: "\(promo.description ?? "") • Sconto \(Int(promo.discountPercent))%\(promo.validFrom != nil && promo.validTo != nil ? " (\(promo.validFrom!) → \(promo.validTo!))" : "")",
-                    systemImage: "tag.fill",
-                    category: .promotions
-                ) { [weak self] in
-                    self?.onNavigatePromotions?(promo.name)
-                })
+        for promo in promotions.prefix(8) {
+            var validity = ""
+            if let start = promo.startDate, let end = promo.endDate {
+                let s = DateFormatter.iso8601DateOnly.string(from: start)
+                let e = DateFormatter.iso8601DateOnly.string(from: end)
+                validity = " (\(s) → \(e))"
             }
+            newItems.append(CommandPaletteItem(
+                title: promo.name,
+                subtitle: "\(promo.description ?? "") • Sconto \(Int(promo.discountPercent))%\(validity)",
+                systemImage: "tag.fill",
+                category: .promotions
+            ) { [weak self] in
+                self?.onNavigatePromotions?(promo.name)
+            })
         }
         
         items = newItems
@@ -296,6 +344,10 @@ final class CommandPaletteState {
     func open() {
         isPresented = true
         searchText = ""
+        rebuildItems()
+        Task {
+            await loadAllData()
+        }
     }
     
     func close() {
@@ -321,78 +373,78 @@ struct CommandPaletteView: View {
     
     var body: some View {
         if state.isPresented {
-            VStack(spacing: 0) {
-                // Search Bar
-                HStack(spacing: 12) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                    
-                    TextField("Cerca o Vai a... (⌘K)", text: $state.searchText)
-                        .focused($isSearchFocused)
-                        .font(.system(size: 15))
-                        .onSubmit { executeSelected() }
-                        .textInputAutocapitalization(.never)
-                        .disableAutocorrection(true)
-                        .padding(.vertical, 12)
-                        .padding(.horizontal, 14)
-                        .background(Color.secondary.opacity(0.1))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                    
-                    Button {
+            ZStack {
+                Color.black.opacity(0.35)
+                    .ignoresSafeArea()
+                    .onTapGesture {
                         state.close()
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundStyle(.secondary)
                     }
-                    .buttonStyle(.plain)
-                    .frame(width: 30, height: 30)
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 16)
-                .background(Color.systemBackground)
                 
-                Divider()
-                
-                // Results
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        LazyVStack(spacing: 4) {
-                            if state.filteredItems.isEmpty {
-                                ContentUnavailableView(
-                                    "Nessun risultato",
-                                    systemImage: "magnifyingglass",
-                                    description: Text("Prova con termini diversi")
-                                )
-                                .frame(minHeight: 200)
-                            } else {
-                                ForEach(Array(state.filteredItems.enumerated()), id: \.element.id) { index, item in
-                                    CommandPaletteRow(
-                                        item: item,
-                                        isSelected: index == selectedIndex
-                                    ) {
-                                        selectedIndex = index
-                                        executeItem(item)
+                VStack(spacing: 0) {
+                    // Search Bar
+                    HStack(spacing: 12) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                        
+                        searchField
+                        
+                        Button {
+                            state.close()
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .frame(width: 30, height: 30)
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 16)
+                    .background(Color.systemBackgroundCompat)
+                    
+                    Divider()
+                    
+                    // Results
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            LazyVStack(spacing: 4) {
+                                if state.filteredItems.isEmpty {
+                                    ContentUnavailableView(
+                                        "Nessun risultato",
+                                        systemImage: "magnifyingglass",
+                                        description: Text("Prova con termini diversi")
+                                    )
+                                    .frame(minHeight: 200)
+                                } else {
+                                    ForEach(Array(state.filteredItems.enumerated()), id: \.element.id) { index, item in
+                                        CommandPaletteRow(
+                                            item: item,
+                                            isSelected: index == selectedIndex
+                                        ) {
+                                            selectedIndex = index
+                                            executeItem(item)
+                                        }
+                                        .id(index)
                                     }
-                                    .id(index)
                                 }
                             }
+                            .padding(12)
                         }
-                        .padding(12)
-                    }
-                    .frame(maxHeight: 400)
-                    .onChange(of: selectedIndex) { _, newValue in
-                        withAnimation(.easeOut(duration: 0.15)) {
-                            proxy.scrollTo(newValue, anchor: .center)
+                        .frame(maxHeight: 400)
+                        .onChange(of: selectedIndex) { _, newValue in
+                            withAnimation(.easeOut(duration: 0.15)) {
+                                proxy.scrollTo(newValue, anchor: .center)
+                            }
                         }
                     }
                 }
+                .frame(minWidth: 320, maxWidth: 560, minHeight: 300, maxHeight: 580)
+                .background(Color.systemBackgroundCompat)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 8)
+                .padding(.horizontal, 16)
             }
-            .frame(minWidth: 440, maxWidth: 560, minHeight: 300, maxHeight: 580)
-            .background(Color.systemBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 8)
             .onAppear {
                 isSearchFocused = true
                 selectedIndex = 0
@@ -406,9 +458,41 @@ struct CommandPaletteView: View {
         }
     }
     
+    @ViewBuilder
+    private var searchField: some View {
+        #if os(iOS)
+        TextField("Cerca o Vai a... (⌘K)", text: $state.searchText)
+            .focused($isSearchFocused)
+            .font(.system(size: 15))
+            .onSubmit { executeSelected() }
+            .textInputAutocapitalization(.never)
+            .disableAutocorrection(true)
+            .padding(.vertical, 12)
+            .padding(.horizontal, 14)
+            .background(Color.secondary.opacity(0.1))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        #else
+        TextField("Cerca o Vai a... (⌘K)", text: $state.searchText)
+            .focused($isSearchFocused)
+            .font(.system(size: 15))
+            .onSubmit { executeSelected() }
+            .disableAutocorrection(true)
+            .padding(.vertical, 12)
+            .padding(.horizontal, 14)
+            .background(Color.secondary.opacity(0.1))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        #endif
+    }
+    
     private func handleKeyPress(_ press: KeyPress) -> KeyPress.Result {
         let items = state.filteredItems
-        guard !items.isEmpty else { return .ignored }
+        guard !items.isEmpty else {
+            if press.key == .escape {
+                state.close()
+                return .handled
+            }
+            return .ignored
+        }
         
         switch press.key {
         case .upArrow:
@@ -438,6 +522,7 @@ struct CommandPaletteView: View {
     }
     
     private func executeItem(_ item: CommandPaletteItem) {
+        state.close()
         item.action()
     }
 }
@@ -491,8 +576,8 @@ struct CommandPaletteRow: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .background(
-            (isSelected || isHovering) 
-                ? Color.blue.opacity(0.08) 
+            (isSelected || isHovering)
+                ? Color.blue.opacity(0.08)
                 : Color.clear
         )
         .clipShape(RoundedRectangle(cornerRadius: 10))
@@ -533,7 +618,6 @@ extension DateFormatter {
         f.dateFormat = "yyyy-MM-dd"
         f.locale = Locale(identifier: "en_US_POSIX")
         f.calendar = Calendar(identifier: .gregorian)
-        f.timeZone = TimeZone(secondsFromGMT: 0)
         return f
     }()
     

@@ -39,9 +39,9 @@ class DashboardViewModel {
         errorMessage = nil
         do {
             async let dashboardData = api.getDashboard(salonId: salonId)
-            async let freeSlot = api.getNextFreeSlot(salonId: salonId)
+            async let freeSlot: NextFreeSlot? = try? api.getNextFreeSlot(salonId: salonId)
             data = try await dashboardData
-            nextFreeSlot = try await freeSlot
+            nextFreeSlot = await freeSlot
         } catch {
             errorMessage = error.localizedDescription
             showError = true

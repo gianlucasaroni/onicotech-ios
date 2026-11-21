@@ -163,30 +163,16 @@ struct ExpenseListView: View {
     }
     
     private func configureCommandPalette() {
-        let clientVM = ClientViewModel()
-        let appointmentVM = AppointmentViewModel()
-        let productVM = ProductViewModel()
-        let promotionVM = PromotionViewModel()
+        commandPaletteState?.setSalonManager(salonManager)
+        commandPaletteState?.updateExpenses(expenses)
         
-        commandPaletteState.configure(
-            clientVM: clientVM,
-            appointmentVM: appointmentVM,
-            productVM: productVM,
-            expenseVM: ExpenseViewModel(),
-            promotionVM: promotionVM,
-            salonManager: salonManager
-        )
-        
-        commandPaletteState.onNewExpense = {
+        commandPaletteState?.onNewExpense = {
             showingForm = true
         }
         
-        commandPaletteState.onNavigateExpenses = { newExpense, search in
+        commandPaletteState?.onNavigateExpenses = { newExpense, _ in
             if newExpense {
                 showingForm = true
-            }
-            if let search = search {
-                // Add search functionality here
             }
         }
     }

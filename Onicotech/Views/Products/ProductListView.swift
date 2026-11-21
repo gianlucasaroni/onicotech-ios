@@ -325,36 +325,25 @@ struct ProductListView: View {
     }
     
     private func configureCommandPalette() {
-        let clientVM = ClientViewModel()
-        let appointmentVM = AppointmentViewModel()
-        let expenseVM = ExpenseViewModel()
-        let promotionVM = PromotionViewModel()
+        commandPaletteState?.setSalonManager(salonManager)
+        commandPaletteState?.updateProducts(viewModel.products)
         
-        commandPaletteState.configure(
-            clientVM: clientVM,
-            appointmentVM: appointmentVM,
-            productVM: viewModel,
-            expenseVM: expenseVM,
-            promotionVM: promotionVM,
-            salonManager: salonManager
-        )
-        
-        commandPaletteState.onNewProduct = {
+        commandPaletteState?.onNewProduct = {
             showingAddProductSheet = true
         }
         
-        commandPaletteState.onNewSale = {
+        commandPaletteState?.onNewSale = {
             showingSaleSheet = true
         }
         
-        commandPaletteState.onNavigateProducts = { newSale, newProduct, search in
+        commandPaletteState?.onNavigateProducts = { newSale, newProduct, search in
             if newSale {
                 showingSaleSheet = true
             } else if newProduct {
                 showingAddProductSheet = true
             }
             if let search = search {
-                // Add search functionality here
+                viewModel.searchText = search
             }
         }
     }

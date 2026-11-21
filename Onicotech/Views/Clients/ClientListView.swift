@@ -17,6 +17,7 @@ struct ClientListView: View {
     @State private var showingDeleteAlert = false
     @State private var clientToDelete: Client?
     @State private var searchText = ""
+    @EnvironmentObject var salonManager: SalonManager
     @Environment(\.commandPaletteState) private var commandPaletteState
     
     var filteredClients: [Client] {
@@ -153,28 +154,14 @@ struct ClientListView: View {
     }
     
     private func configureCommandPalette() {
-        let appointmentVM = AppointmentViewModel()
-        let productVM = ProductViewModel()
-        let expenseVM = ExpenseViewModel()
-        let promotionVM = PromotionViewModel()
+        commandPaletteState?.setSalonManager(salonManager)
+        commandPaletteState?.updateClients(viewModel.clients)
         
-        commandPaletteState.configure(
-            clientVM: viewModel,
-            appointmentVM: appointmentVM,
-            productVM: productVM,
-            expenseVM: expenseVM,
-            promotionVM: promotionVM,
-            salonManager: SalonManager.shared
-        )
-        
-        commandPaletteState.onNewClient = {
+        commandPaletteState?.onNewClient = {
             showingAddSheet = true
         }
         
-        commandPaletteState.onNavigateClients = { search, clientId in
-            if let clientId = clientId {
-                // Navigate to client detail
-            }
+        commandPaletteState?.onNavigateClients = { search, _ in
             if let search = search {
                 self.searchText = search
             }

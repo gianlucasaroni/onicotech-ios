@@ -566,6 +566,7 @@ struct AppointmentFormView: View {
             Task {
                 if let prefill = try? await APIClient.shared.getLastAppointmentForClient(clientId: clientId) {
                     await MainActor.run {
+                        guard self.selectedClientId == clientId else { return }
                         if !prefill.serviceIds.isEmpty {
                             selectedServiceIds = Set(prefill.serviceIds)
                         }

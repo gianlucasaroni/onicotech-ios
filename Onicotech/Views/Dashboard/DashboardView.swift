@@ -287,7 +287,7 @@ struct NextFreeSlotWidget: View {
             .sheet(isPresented: $showAppointmentForm) {
                 AppointmentFormView(
                     viewModel: AppointmentViewModel(),
-                    preselectedDate: DateFormatter.iso8601DateOnly.date(from: slot.date) ?? Date(),
+                    preselectedDate: parsedSlotDate,
                     preselectedTime: DateFormatter.timeOnly.date(from: slot.startTime)
                 )
             }
@@ -302,14 +302,18 @@ struct NextFreeSlotWidget: View {
         )
     }
     
-    private var formattedDate: String {
+    private var parsedSlotDate: Date {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
-        guard let date = formatter.date(from: slot.date) else { return slot.date }
-        
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        return formatter.date(from: slot.date) ?? Date()
+    }
+    
+    private var formattedDate: String {
+        let formatter = DateFormatter()
         formatter.dateStyle = .full
         formatter.locale = Locale(identifier: "it_IT")
-        return formatter.string(from: date).capitalized
+        return formatter.string(from: parsedSlotDate).capitalized
     }
 }
 

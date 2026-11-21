@@ -509,7 +509,7 @@ struct AppointmentWeekView: View {
         let bg = dayBackgroundColor(for: day, index: index, isToday: isToday, isSelected: isSelected)
         
         // Drag gesture for creating appointments
-        let dragGesture = DragGesture(minimumDistance: 5, coordinateSpace: .named("weekGrid"))
+        let dragGesture = DragGesture(minimumDistance: 12, coordinateSpace: .named("weekGrid"))
             .onChanged { value in
                 if !dragState.isDragging {
                     // Start drag
@@ -523,12 +523,13 @@ struct AppointmentWeekView: View {
                     }
                 }
                 
-                if dragState.isDragging {
+                if dragState.isDragging, let startMinute = dragState.startMinute {
                     let currentMinute = pointToMinute(value.location)
+                    let clampedMinute = min(max(currentMinute, minHour * 60), maxHour * 60 - 1)
                     dragState.currentDay = day
-                    dragState.currentMinute = currentMinute.clamped(to: minHour * 60...maxHour * 60 - 1)
+                    dragState.currentMinute = clampedMinute
                     dragState.currentPoint = value.location
-                    updateDragPreview(day: day, startMinute: dragState.startMinute!, currentMinute: dragState.currentMinute!)
+                    updateDragPreview(day: day, startMinute: startMinute, currentMinute: clampedMinute)
                 }
             }
             .onEnded { _ in
@@ -557,17 +558,23 @@ struct AppointmentWeekView: View {
                             .frame(height: 0.5)
                             .offset(y: hourHeight / 2.0)
                         
-                        // Draggable slot (:00)
+                        // Tappable & draggable slot (:00)
                         Color.clear
                             .frame(height: hourHeight / 2.0)
                             .contentShape(Rectangle())
+                            .onTapGesture {
+                                handleSlotTap(day: day, hour: hour, minute: 0)
+                            }
                             .gesture(dragGesture)
                             .offset(y: 0)
                         
-                        // Draggable slot (:30)
+                        // Tappable & draggable slot (:30)
                         Color.clear
                             .frame(height: hourHeight / 2.0)
                             .contentShape(Rectangle())
+                            .onTapGesture {
+                                handleSlotTap(day: day, hour: hour, minute: 30)
+                            }
                             .gesture(dragGesture)
                             .offset(y: hourHeight / 2.0)
                     }
@@ -731,41 +738,44 @@ struct AppointmentWeekView: View {
         dragPreviewFrame = CGRect(x: 2, y: topOffset, width: 0, height: height)
     }
     
+    @ViewBuilder
     private func dragPreviewOverlay(day: Date, width: CGFloat) -> some View {
-        let minM = min(dragState.startMinute!, dragState.currentMinute!)
-        let maxM = max(dragState.startMinute!, dragState.currentMinute!)
-        let topOffset = CGFloat(minM - minHour * 60) * pixelsPerMinute
-        let height = max(20.0, CGFloat(maxM - minM + 30) * pixelsPerMinute)
-        let startHour = minM / 60
-        let startMin = minM % 60
-        let endHour = (maxM + 29) / 60
-        let endMin = (maxM + 29) % 60
-        
-        return ZStack(alignment: .topLeading) {
-            RoundedRectangle(cornerRadius: 6)
-                .fill(Color.blue.opacity(0.2))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(Color.blue, style: StrokeStyle(lineWidth: 2, dash: [4, 4]))
-                )
+        if let startMinute = dragState.startMinute, let currentMinute = dragState.currentMinute {
+            let minM = min(startMinute, currentMinute)
+            let maxM = max(startMinute, currentMinute)
+            let topOffset = CGFloat(minM - minHour * 60) * pixelsPerMinute
+            let height = max(20.0, CGFloat(maxM - minM + 30) * pixelsPerMinute)
+            let startHour = minM / 60
+            let startMin = minM % 60
+            let endHour = (maxM + 29) / 60
+            let endMin = (maxM + 29) % 60
             
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Nuovo appuntamento")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.blue)
-                Text("\(String(format: "%02d:%02d", startHour, startMin)) - \(String(format: "%02d:%02d", endHour, endMin))")
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundStyle(.blue)
-                Text("\(maxM - minM + 30) min")
-                    .font(.system(size: 8))
-                    .foregroundStyle(.blue.opacity(0.8))
+            ZStack(alignment: .topLeading) {
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.blue.opacity(0.2))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(Color.blue, style: StrokeStyle(lineWidth: 2, dash: [4, 4]))
+                    )
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Nuovo appuntamento")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.blue)
+                    Text("\(String(format: "%02d:%02d", startHour, startMin)) - \(String(format: "%02d:%02d", endHour, endMin))")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(.blue)
+                    Text("\(maxM - minM + 30) min")
+                        .font(.system(size: 8))
+                        .foregroundStyle(.blue.opacity(0.8))
+                }
+                .padding(6)
             }
-            .padding(6)
+            .frame(width: max(0, width - 4), height: height)
+            .offset(x: 2, y: topOffset)
+            .zIndex(20)
+            .allowsHitTesting(false)
         }
-        .frame(width: max(0, width - 4), height: height)
-        .offset(x: 2, y: topOffset)
-        .zIndex(20)
-        .allowsHitTesting(false)
     }
     
     private func finalizeDragCreate(day: Date) {

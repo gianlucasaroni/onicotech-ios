@@ -191,13 +191,16 @@ struct NailTechnicalSheetView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 20)
             } else {
-                // Group photos by appointment date
+                // Group photos by appointment
                 let groupedPhotos = Dictionary(grouping: nailPhotos, by: { $0.appointmentId })
+                let sortedAppointmentIds = groupedPhotos.keys.sorted { id1, id2 in
+                    let d1 = groupedPhotos[id1]?.map(\.createdAt).max() ?? .distantPast
+                    let d2 = groupedPhotos[id2]?.map(\.createdAt).max() ?? .distantPast
+                    return d1 > d2
+                }
                 
-                ForEach(Array(groupedPhotos.keys.sorted()), id: \.self) { appointmentId in
-                    if let appointment = nailPhotos.first(where: { $0.appointmentId == appointmentId }) {
-                        TimelineEntryView(photos: groupedPhotos[appointmentId] ?? [])
-                    }
+                ForEach(sortedAppointmentIds, id: \.self) { appointmentId in
+                    TimelineEntryView(photos: groupedPhotos[appointmentId] ?? [])
                 }
             }
         }
@@ -205,10 +208,11 @@ struct NailTechnicalSheetView: View {
     }
     
     private var isEmpty: Bool {
-        client.nailType == nil || client.nailType!.isEmpty &&
-        client.preferredShape == nil || client.preferredShape!.isEmpty &&
-        client.technicalNotes == nil || client.technicalNotes!.isEmpty &&
-        client.customerTag == nil || client.customerTag!.isEmpty
+        (client.nailType?.isEmpty ?? true) &&
+        (client.preferredShape?.isEmpty ?? true) &&
+        (client.technicalNotes?.isEmpty ?? true) &&
+        (client.customerTag?.isEmpty ?? true) &&
+        (client.allergies?.isEmpty ?? true)
     }
     
     private func tagColor(_ tag: String) -> Color {

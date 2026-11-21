@@ -3,7 +3,6 @@ import Observation
 internal import EventKit
 import SwiftUI
 import Combine
-import OnicotechWatchShared
 #if canImport(WidgetKit)
 import WidgetKit
 #endif
@@ -160,7 +159,7 @@ class AppointmentViewModel {
         formatter.locale = Locale(identifier: "en_US_POSIX")
         
         let upcoming = appointments
-            .filter { !$0.isCompleted && !$0.isCancelled }
+            .filter { $0.status != .completed && $0.status != .cancelled && $0.status != .expired }
             .compactMap { apt -> Date? in
                 let dateString = "\(apt.date) \(apt.startTime)"
                 return formatter.date(from: dateString)

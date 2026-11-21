@@ -7,7 +7,6 @@ import WatchKit
 #if canImport(WidgetKit)
 import WidgetKit
 #endif
-import OnicotechWatchShared
 
 @MainActor
 final class WatchAppointmentsViewModel: ObservableObject {
@@ -93,15 +92,14 @@ final class WatchAppointmentsViewModel: ObservableObject {
     
     private func updateWidgetSchedule(with appointments: [WatchAppointment]) {
         let now = Date()
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
+        let aptFormatter = DateFormatter()
+        aptFormatter.dateFormat = "yyyy-MM-dd HH:mm"
+        aptFormatter.locale = Locale(identifier: "en_US_POSIX")
         
         let upcoming = appointments
             .filter { !$0.isCompleted && !$0.isCancelled }
             .compactMap { apt -> Date? in
                 let dateString = "\(apt.date) \(apt.startTime)"
-                let aptFormatter = DateFormatter()
-                aptFormatter.dateFormat = "yyyy-MM-dd HH:mm"
                 return aptFormatter.date(from: dateString)
             }
             .filter { $0 > now }
