@@ -20,17 +20,6 @@ enum WeekDensityMode: String, CaseIterable, Identifiable {
     }
 }
 
-// Drag-to-create state
-struct DragCreateState {
-    var isDragging: Bool = false
-    var startDay: Date? = nil
-    var startMinute: Int? = nil
-    var currentDay: Date? = nil
-    var currentMinute: Int? = nil
-    var startPoint: CGPoint? = nil
-    var currentPoint: CGPoint? = nil
-}
-
 struct AppointmentWeekView: View {
     @Bindable var viewModel: AppointmentViewModel
     @EnvironmentObject var salonManager: SalonManager
@@ -46,11 +35,7 @@ struct AppointmentWeekView: View {
     @State private var scrollOffsetX: CGFloat = 0
     @State private var timelineWidth: CGFloat = 390
     @State private var salonBusinessHours: [BusinessHourItem] = []
-    
-    // Drag-to-create state
-    @State private var dragState = DragCreateState()
-    @State private var dragPreviewFrame: CGRect = .zero
-    @State private var isCreatingAppointment: Bool = false
+    @State private var lastWeekSwipeDate: Date = .distantPast
     
     private let hourHeight: CGFloat = 64.0
     private let timeColWidth: CGFloat = 44.0
@@ -92,6 +77,7 @@ struct AppointmentWeekView: View {
             // MARK: - 2. Apple Calendar 7-Day Mini Strip (Lun..Dom)
             weekDaysMiniStrip
                 .background(Color.systemBackgroundCompat)
+                .simultaneousGesture(weekSwipeGesture)
                 .zIndex(9)
             
             Divider()
@@ -110,12 +96,15 @@ struct AppointmentWeekView: View {
                     
                     let colCount: CGFloat = CGFloat(densityMode.visibleDaysCount)
                     let colWidth = floor((availableWidth - separatorWidth * (colCount - 1)) / colCount)
+                    let contentWidth = CGFloat(viewModel.currentWeekDays.count) * (colWidth + separatorWidth)
+                    let maxScrollX = max(0, contentWidth - availableWidth)
                     
                     VStack(spacing: 0) {
                         // MARK: - Sticky Day Headers Strip (Synchronized with columns below!)
                         stickyDayHeaders(colWidth: colWidth, availableWidth: availableWidth)
                             .background(Color.systemBackgroundCompat)
                             .shadow(color: .black.opacity(0.03), radius: 2, x: 0, y: 1)
+                            .simultaneousGesture(weekSwipeGesture)
                             .zIndex(8)
                         
                         Divider()
@@ -138,11 +127,20 @@ struct AppointmentWeekView: View {
                                             .scrollTargetLayout()
                                     }
                                     .scrollTargetBehavior(.viewAligned)
+                                    .scrollDisabled(densityMode == .fullWeek)
                                     .frame(width: availableWidth)
+                                    .simultaneousGesture(fullWeekGridSwipeGesture)
                                     .onScrollGeometryChange(for: CGFloat.self) { geo in
                                         geo.contentOffset.x
-                                    } action: { _, newOffset in
+                                    } action: { oldOffset, newOffset in
                                         scrollOffsetX = newOffset
+                                        guard densityMode != .fullWeek else { return }
+                                        let overscrollThreshold: CGFloat = 52
+                                        if newOffset < -overscrollThreshold && oldOffset >= -overscrollThreshold {
+                                            triggerWeekSwipe(direction: -1, landOnEdge: true)
+                                        } else if newOffset > maxScrollX + overscrollThreshold && oldOffset <= maxScrollX + overscrollThreshold {
+                                            triggerWeekSwipe(direction: 1, landOnEdge: true)
+                                        }
                                     }
                                     .onAppear {
                                         scrollToSelectedDay(proxy: horizontalProxy)
@@ -537,42 +535,11 @@ struct AppointmentWeekView: View {
         let breakRange = getDayBreak(day: day)
         let bg = dayBackgroundColor(for: day, index: index, isToday: isToday, isSelected: isSelected)
         
-        // Drag gesture for creating appointments
-        let dragGesture = DragGesture(minimumDistance: 12, coordinateSpace: .named("weekGrid"))
-            .onChanged { value in
-                if !dragState.isDragging {
-                    // Start drag
-                    let startMinute = pointToMinute(value.startLocation)
-                    if startMinute >= minHour * 60 && startMinute < maxHour * 60 {
-                        dragState.isDragging = true
-                        dragState.startDay = day
-                        dragState.startMinute = startMinute
-                        dragState.startPoint = value.startLocation
-                        Haptics.play(.light)
-                    }
-                }
-                
-                if dragState.isDragging, let startMinute = dragState.startMinute {
-                    let currentMinute = pointToMinute(value.location)
-                    let clampedMinute = min(max(currentMinute, minHour * 60), maxHour * 60 - 1)
-                    dragState.currentDay = day
-                    dragState.currentMinute = clampedMinute
-                    dragState.currentPoint = value.location
-                    updateDragPreview(day: day, startMinute: startMinute, currentMinute: clampedMinute)
-                }
-            }
-            .onEnded { _ in
-                if dragState.isDragging {
-                    finalizeDragCreate(day: day)
-                }
-                resetDragState()
-            }
-        
         return ZStack(alignment: .topLeading) {
             // Background with alternating contrast
             bg
             
-            // 1. Hour Lines & Draggable Slots
+            // 1. Hour Lines & Long-Press-to-Create Slots (scroll-safe)
             VStack(spacing: 0) {
                 ForEach(minHour..<maxHour, id: \.self) { hour in
                     ZStack(alignment: .top) {
@@ -581,36 +548,33 @@ struct AppointmentWeekView: View {
                             .fill(Color.secondary.opacity(0.20))
                             .frame(height: 0.8)
                         
-                        // Half-hour dashed divider line
+                        // Half-hour divider line
                         Rectangle()
                             .fill(Color.secondary.opacity(0.10))
                             .frame(height: 0.5)
                             .offset(y: hourHeight / 2.0)
                         
-                        // Tappable & draggable slot (:00)
+                        // Long-press slot (:00)
                         Color.clear
                             .frame(height: hourHeight / 2.0)
                             .contentShape(Rectangle())
-                            .onTapGesture {
-                                handleSlotTap(day: day, hour: hour, minute: 0)
+                            .onLongPressGesture(minimumDuration: 0.45, maximumDistance: 12) {
+                                handleSlotLongPress(day: day, hour: hour, minute: 0)
                             }
-                            .gesture(dragGesture)
                             .offset(y: 0)
                         
-                        // Tappable & draggable slot (:30)
+                        // Long-press slot (:30)
                         Color.clear
                             .frame(height: hourHeight / 2.0)
                             .contentShape(Rectangle())
-                            .onTapGesture {
-                                handleSlotTap(day: day, hour: hour, minute: 30)
+                            .onLongPressGesture(minimumDuration: 0.45, maximumDistance: 12) {
+                                handleSlotLongPress(day: day, hour: hour, minute: 30)
                             }
-                            .gesture(dragGesture)
                             .offset(y: hourHeight / 2.0)
                     }
                     .frame(height: hourHeight)
                 }
             }
-            .coordinateSpace(name: "weekGrid")
             
             // 2. Closed Day watermark
             if closed && dayAppts.isEmpty {
@@ -751,107 +715,58 @@ struct AppointmentWeekView: View {
                     }
                 }
             }
-            
-            // 6. Drag Preview Overlay
-            if dragState.isDragging && dragState.startDay == day {
-                dragPreviewOverlay(day: day, width: width)
-            }
         }
         .frame(height: totalGridHeight)
     }
     
-    // MARK: - Drag Helpers
-    private func pointToMinute(_ point: CGPoint) -> Int {
-        let minute = Int((point.y / pixelsPerMinute).rounded()) + minHour * 60
-        return minute
-    }
-    
-    private func updateDragPreview(day: Date, startMinute: Int, currentMinute: Int) {
-        let minM = min(startMinute, currentMinute)
-        let maxM = max(startMinute, currentMinute)
-        let topOffset = CGFloat(minM - minHour * 60) * pixelsPerMinute
-        let height = max(20.0, CGFloat(maxM - minM + 30) * pixelsPerMinute)
-        
-        dragPreviewFrame = CGRect(x: 2, y: topOffset, width: 0, height: height)
-    }
-    
-    @ViewBuilder
-    private func dragPreviewOverlay(day: Date, width: CGFloat) -> some View {
-        if let startMinute = dragState.startMinute, let currentMinute = dragState.currentMinute {
-            let minM = min(startMinute, currentMinute)
-            let maxM = max(startMinute, currentMinute)
-            let topOffset = CGFloat(minM - minHour * 60) * pixelsPerMinute
-            let height = max(20.0, CGFloat(maxM - minM + 30) * pixelsPerMinute)
-            let startHour = minM / 60
-            let startMin = minM % 60
-            let endHour = (maxM + 29) / 60
-            let endMin = (maxM + 29) % 60
-            
-            ZStack(alignment: .topLeading) {
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(Color.blue.opacity(0.2))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6)
-                            .stroke(Color.blue, style: StrokeStyle(lineWidth: 2, dash: [4, 4]))
-                    )
-                
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Nuovo appuntamento")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(.blue)
-                    Text("\(String(format: "%02d:%02d", startHour, startMin)) - \(String(format: "%02d:%02d", endHour, endMin))")
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundStyle(.blue)
-                    Text("\(maxM - minM + 30) min")
-                        .font(.system(size: 8))
-                        .foregroundStyle(.blue.opacity(0.8))
-                }
-                .padding(6)
+    // MARK: - Week Swipe Gestures
+    private var weekSwipeGesture: some Gesture {
+        DragGesture(minimumDistance: 24, coordinateSpace: .local)
+            .onEnded { value in
+                let dx = value.translation.width
+                let dy = value.translation.height
+                guard abs(dx) > 45, abs(dx) > abs(dy) * 1.4 else { return }
+                triggerWeekSwipe(direction: dx < 0 ? 1 : -1)
             }
-            .frame(width: max(0, width - 4), height: height)
-            .offset(x: 2, y: topOffset)
-            .zIndex(20)
-            .allowsHitTesting(false)
-        }
     }
-    
-    private func finalizeDragCreate(day: Date) {
-        guard let startMinute = dragState.startMinute,
-              let currentMinute = dragState.currentMinute else { return }
-        
-        let minM = min(startMinute, currentMinute)
-        let maxM = max(startMinute, currentMinute)
-        
-        // Ensure minimum 15 minutes
-        if maxM - minM < 15 { return }
-        
-        let cal = Calendar.current
-        var startComps = cal.dateComponents([.year, .month, .day], from: day)
-        startComps.hour = minM / 60
-        startComps.minute = minM % 60
-        startComps.second = 0
-        let startDate = cal.date(from: startComps) ?? day
-        
-        var endComps = cal.dateComponents([.year, .month, .day], from: day)
-        endComps.hour = (maxM + 29) / 60
-        endComps.minute = (maxM + 29) % 60
-        endComps.second = 0
-        let endDate = cal.date(from: endComps) ?? day
-        
-        isCreatingAppointment = true
-        Haptics.play(.success)
-        
-        onAddAppointment?(startDate, endDate)
-        
-        // Reset after a brief delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            isCreatingAppointment = false
-        }
+
+    private var fullWeekGridSwipeGesture: some Gesture {
+        DragGesture(minimumDistance: 24, coordinateSpace: .local)
+            .onEnded { value in
+                guard densityMode == .fullWeek else { return }
+                let dx = value.translation.width
+                let dy = value.translation.height
+                guard abs(dx) > 50, abs(dx) > abs(dy) * 1.4 else { return }
+                triggerWeekSwipe(direction: dx < 0 ? 1 : -1)
+            }
     }
-    
-    private func resetDragState() {
-        dragState = DragCreateState()
-        dragPreviewFrame = .zero
+
+    private func triggerWeekSwipe(direction: Int, landOnEdge: Bool = false) {
+        let now = Date()
+        guard now.timeIntervalSince(lastWeekSwipeDate) > 0.55 else { return }
+        lastWeekSwipeDate = now
+        Haptics.play(.selection)
+
+        withAnimation(.easeInOut(duration: 0.22)) {
+            if landOnEdge {
+                var cal = Calendar(identifier: .gregorian)
+                cal.firstWeekday = 2
+                let currentMonday = viewModel.currentWeekMonday
+                if direction > 0 {
+                    if let nextMonday = cal.date(byAdding: .day, value: 7, to: currentMonday) {
+                        viewModel.selectedDate = nextMonday
+                    }
+                } else {
+                    let dayOffset = max(0, 7 - densityMode.visibleDaysCount)
+                    if let prevMonday = cal.date(byAdding: .day, value: -7, to: currentMonday),
+                       let target = cal.date(byAdding: .day, value: dayOffset, to: prevMonday) {
+                        viewModel.selectedDate = target
+                    }
+                }
+            } else {
+                viewModel.changeWeek(by: direction)
+            }
+        }
     }
     
     // MARK: - Vertical Separator (Crisp 1.0pt Native Separator)
@@ -871,8 +786,8 @@ struct AppointmentWeekView: View {
     
     // MARK: - Actions & Helpers
     
-    private func handleSlotTap(day: Date, hour: Int, minute: Int) {
-        Haptics.play(.selection)
+    private func handleSlotLongPress(day: Date, hour: Int, minute: Int) {
+        Haptics.play(.medium)
         let cal = Calendar.current
         var comps = cal.dateComponents([.year, .month, .day], from: day)
         comps.hour = hour
@@ -885,8 +800,10 @@ struct AppointmentWeekView: View {
     
     private func scrollToSelectedDay(proxy: ScrollViewProxy) {
         let startOfDay = Calendar.current.startOfDay(for: viewModel.selectedDate)
-        withAnimation(.easeInOut(duration: 0.25)) {
-            proxy.scrollTo(startOfDay, anchor: .leading)
+        Task { @MainActor in
+            withAnimation(.easeInOut(duration: 0.25)) {
+                proxy.scrollTo(startOfDay, anchor: .leading)
+            }
         }
     }
     

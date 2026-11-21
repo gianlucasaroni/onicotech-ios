@@ -201,6 +201,7 @@ struct AppointmentListView: View {
                         NavigationLink(destination: AppointmentDetailView(appointmentId: appointment.id ?? UUID(), initialAppointment: appointment, viewModel: viewModel)) {
                             AppointmentRowView(appointment: appointment)
                         }
+                        .listRowInsets(EdgeInsets(top: 6, leading: 14, bottom: 6, trailing: 14))
                         .swipeActions(edge: .leading, allowsFullSwipe: true) {
                             if appointment.status == .pending {
                                 Button {
@@ -304,135 +305,131 @@ struct AppointmentRowView: View {
         }
         return statusColor
     }
+
+    private var subtitleText: String {
+        var parts: [String] = []
+        if let services = appointment.services, !services.isEmpty {
+            parts.append(services.map(\.name).joined(separator: ", "))
+        }
+        if let staffName = appointment.staffMember?.displayName, !staffName.isEmpty {
+            parts.append(staffName)
+        }
+        if let salonName = appointment.salon?.name, !salonName.isEmpty, appointment.salon?.isDefault == false {
+            parts.append(salonName)
+        }
+        return parts.joined(separator: " • ")
+    }
+
+    private var hasExtraMeta: Bool {
+        let hasProducts = !(appointment.products?.isEmpty ?? true)
+        let hasNotes = !(appointment.notes?.isEmpty ?? true)
+        return hasProducts || hasNotes
+    }
     
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .center, spacing: 10) {
             Capsule()
                 .fill(accentColor)
-                .frame(width: 3.5)
-                .padding(.vertical, 2)
+                .frame(width: 3, height: 34)
 
-            VStack(alignment: .leading, spacing: 5) {
-                HStack(spacing: 6) {
-                    Text(appointment.timeRange)
-                        .font(.subheadline.weight(.bold))
+            // Compact time column
+            VStack(alignment: .leading, spacing: 1) {
+                Text(appointment.startTime)
+                    .font(.subheadline.weight(.bold))
+                    .monospacedDigit()
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                if let endTime = appointment.endTime, !endTime.isEmpty {
+                    Text(endTime)
+                        .font(.caption2)
                         .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            .frame(width: 46, alignment: .leading)
+
+            // Client + Services + optional compact notes/products
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 4) {
+                    Text(appointment.client?.fullName ?? "Cliente")
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
                     
-                    if let salon = appointment.salon {
-                        SalonBadge(name: salon.name, isDefault: salon.isDefault)
-                    }
-                    
-                    Spacer(minLength: 4)
-                    
-                    if let status = appointment.status {
-                        Label(status.displayName, systemImage: status.iconName)
-                            .font(.caption2.weight(.semibold))
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 3)
-                            .background(statusColor.opacity(0.12))
-                            .foregroundStyle(statusColor)
-                            .clipShape(Capsule())
-                            .fixedSize()
-                    }
-                }
-                
-                if let client = appointment.client {
-                    HStack(spacing: 6) {
-                        Text(client.fullName)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.primary)
-                            .lineLimit(1)
-                        
-                        if let tag = client.customerTag, !tag.isEmpty {
-                            Text(tag)
-                                .font(.caption2.bold())
-                                .padding(.horizontal, 5)
-                                .padding(.vertical, 1)
-                                .background(Color.purple.opacity(0.12))
-                                .foregroundStyle(.purple)
-                                .clipShape(Capsule())
-                                .fixedSize()
-                        }
-                        
-                        if let allergies = client.allergies, !allergies.isEmpty {
-                            HStack(spacing: 2) {
-                                Image(systemName: "exclamationmark.triangle.fill")
-                                Text(allergies)
-                                    .lineLimit(1)
-                            }
-                            .font(.caption2.bold())
+                    if let tag = appointment.client?.customerTag, !tag.isEmpty {
+                        Text(tag)
+                            .font(.system(size: 9, weight: .bold))
                             .padding(.horizontal, 5)
                             .padding(.vertical, 1)
-                            .background(Color.red.opacity(0.12))
-                            .foregroundStyle(.red)
-                            .clipShape(Capsule())
-                        }
-                        
-                        Spacer(minLength: 0)
-                        
-                        if let staff = appointment.staffMember {
-                            HStack(spacing: 4) {
-                                Circle()
-                                    .fill(Color(hex: staff.color ?? "#9333EA"))
-                                    .frame(width: 6, height: 6)
-                                Text(staff.displayName)
-                                    .font(.caption2.weight(.medium))
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                            }
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.secondary.opacity(0.1))
+                            .background(Color.purple.opacity(0.12))
+                            .foregroundStyle(.purple)
                             .clipShape(Capsule())
                             .fixedSize()
-                        }
+                    }
+                    
+                    if let allergies = appointment.client?.allergies, !allergies.isEmpty {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.red)
                     }
                 }
                 
-                if let services = appointment.services, !services.isEmpty {
-                    Text(services.map(\.name).joined(separator: ", "))
+                if !subtitleText.isEmpty {
+                    Text(subtitleText)
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .lineLimit(2)
+                        .lineLimit(1)
                 }
 
-                HStack(spacing: 6) {
-                    if let products = appointment.products, !products.isEmpty {
-                        HStack(spacing: 3) {
-                            Image(systemName: "bag.fill")
-                                .font(.caption2)
-                            Text("\(products.count) prod.")
-                                .font(.caption2.bold())
-                        }
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.blue.opacity(0.12))
-                        .foregroundStyle(.blue)
-                        .clipShape(Capsule())
-                        .fixedSize()
-                    }
-                    
-                    if let notes = appointment.notes, !notes.isEmpty {
-                        Label(notes, systemImage: "note.text")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-                    
-                    Spacer(minLength: 4)
-                    
-                    if appointment.totalPrice != nil || appointment.finalPrice != nil {
-                        Text(appointment.formattedFinalPrice)
-                            .font(.subheadline.weight(.semibold))
-                            .monospacedDigit()
-                            .foregroundStyle(.primary)
+                if hasExtraMeta {
+                    HStack(spacing: 6) {
+                        if let products = appointment.products, !products.isEmpty {
+                            HStack(spacing: 2) {
+                                Image(systemName: "bag.fill")
+                                    .font(.system(size: 9))
+                                Text("\(products.count) prod.")
+                                    .font(.caption2.weight(.medium))
+                            }
+                            .foregroundStyle(.blue)
                             .fixedSize()
+                        }
+                        
+                        if let notes = appointment.notes, !notes.isEmpty {
+                            Label(notes, systemImage: "note.text")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
                     }
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            // Trailing price & compact status
+            VStack(alignment: .trailing, spacing: 2) {
+                if appointment.totalPrice != nil || appointment.finalPrice != nil {
+                    Text(appointment.formattedFinalPrice)
+                        .font(.subheadline.weight(.semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                }
+
+                if let status = appointment.status {
+                    HStack(spacing: 3) {
+                        Circle()
+                            .fill(statusColor)
+                            .frame(width: 6, height: 6)
+                        Text(status.displayName)
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(statusColor)
+                            .lineLimit(1)
+                    }
+                }
+            }
+            .fixedSize()
         }
-        .padding(.vertical, 3)
+        .padding(.vertical, 2)
     }
 }
