@@ -98,7 +98,7 @@ struct DashboardView: View {
                 .buttonStyle(.plain)
                 
                 // Next Appointments
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 8) {
                     Text("Prossimi Appuntamenti")
                         .font(.headline)
                         .padding(.horizontal)
@@ -111,14 +111,10 @@ struct DashboardView: View {
                         )
                         .padding()
                     } else {
-                        LazyVStack(spacing: 12) {
+                        LazyVStack(spacing: 8) {
                             ForEach(viewModel.nextAppointments) { appointment in
                                 NavigationLink(destination: AppointmentDetailView(appointmentId: appointment.id!, initialAppointment: appointment, viewModel: appointmentViewModel)) {
-                                    AppointmentRowView(appointment: appointment)
-                                        .padding()
-                                        .background(Color.systemBackgroundCompat)
-                                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                                        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+                                    DashboardAppointmentRow(appointment: appointment)
                                 }
                                 .buttonStyle(.plain)
                                 .padding(.horizontal)
@@ -221,99 +217,287 @@ struct StatCard: View {
     }
 }
 
+// MARK: - Compact Dashboard Appointment Row
+
+struct DashboardAppointmentRow: View {
+    let appointment: Appointment
+
+    private static let isoDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        return formatter
+    }()
+
+    private static let shortDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "d MMM"
+        formatter.locale = Locale(identifier: "it_IT")
+        return formatter
+    }()
+
+    private var statusColor: Color {
+        switch appointment.status {
+        case .scheduled: return .blue
+        case .pending: return .orange
+        case .completed: return .green
+        case .rescheduled: return .purple
+        case .cancelled: return .red
+        case .expired: return .gray
+        case .none: return .gray
+        }
+    }
+
+    private var accentColor: Color {
+        if let hex = appointment.staffMember?.color, !hex.isEmpty {
+            return Color(hex: hex)
+        }
+        return statusColor
+    }
+
+    private var parsedDate: Date? {
+        Self.isoDateFormatter.date(from: appointment.date)
+    }
+
+    private var dateLabel: String {
+        guard let date = parsedDate else { return appointment.date }
+        let calendar = Calendar.current
+        if calendar.isDateInToday(date) { return "Oggi" }
+        if calendar.isDateInTomorrow(date) { return "Domani" }
+        return Self.shortDateFormatter.string(from: date).capitalized
+    }
+
+    private var isToday: Bool {
+        guard let date = parsedDate else { return false }
+        return Calendar.current.isDateInToday(date)
+    }
+
+    private var subtitleText: String {
+        var parts: [String] = []
+        if let services = appointment.services, !services.isEmpty {
+            parts.append(services.map(\.name).joined(separator: ", "))
+        }
+        if let staffName = appointment.staffMember?.displayName, !staffName.isEmpty {
+            parts.append(staffName)
+        }
+        return parts.joined(separator: " • ")
+    }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Capsule()
+                .fill(accentColor)
+                .frame(width: 3, height: 34)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(appointment.startTime)
+                    .font(.subheadline.weight(.bold))
+                    .monospacedDigit()
+                    .foregroundStyle(.primary)
+                Text(dateLabel)
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(isToday ? .purple : .secondary)
+                    .lineLimit(1)
+            }
+            .frame(width: 52, alignment: .leading)
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 4) {
+                    Text(appointment.client?.fullName ?? "Cliente")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    if let allergies = appointment.client?.allergies, !allergies.isEmpty {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.red)
+                    }
+                }
+
+                if !subtitleText.isEmpty {
+                    Text(subtitleText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            VStack(alignment: .trailing, spacing: 3) {
+                if appointment.totalPrice != nil || appointment.finalPrice != nil {
+                    Text(appointment.formattedFinalPrice)
+                        .font(.subheadline.weight(.semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                }
+
+                if let status = appointment.status {
+                    HStack(spacing: 3) {
+                        Circle()
+                            .fill(statusColor)
+                            .frame(width: 6, height: 6)
+                        Text(status.displayName)
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(statusColor)
+                            .lineLimit(1)
+                    }
+                }
+            }
+            .fixedSize()
+
+            Image(systemName: "chevron.right")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Color.systemBackgroundCompat)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .shadow(color: Color.black.opacity(0.04), radius: 2, x: 0, y: 1)
+    }
+}
+
 // MARK: - Next Free Slot Widget
 
 struct NextFreeSlotWidget: View {
     let slot: NextFreeSlot
     @State private var showAppointmentForm = false
-    
-    var body: some View {
-        HStack(spacing: 14) {
-            // Icon
-            ZStack {
-                Circle()
-                    .fill(Color.green.opacity(0.15))
-                    .frame(width: 48, height: 48)
-                
-                Image(systemName: "calendar.badge.clock")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(.green)
-            }
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Prossimo slot libero")
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundStyle(.secondary)
-                    .textCase(.uppercase)
-                
-                Text(formattedDate)
-                    .font(.headline)
-                    .fontWeight(.bold)
-                    .foregroundStyle(.primary)
-                
-                HStack(spacing: 8) {
-                    Label(slot.startTime, systemImage: "clock")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    
-                    if let staffName = slot.staffName, !staffName.isEmpty {
-                        Label(staffName, systemImage: "person.fill")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-            
-            Spacer()
-            
-            Button {
-                Haptics.play(.light)
-                showAppointmentForm = true
-            } label: {
-                HStack(spacing: 6) {
-                    Text("Prenota")
-                        .font(.subheadline.weight(.semibold))
-                    Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 14, weight: .semibold))
-                }
-                .foregroundStyle(.white)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background(Color.green)
-                .clipShape(Capsule())
-            }
-            .buttonStyle(.plain)
-            .sheet(isPresented: $showAppointmentForm) {
-                AppointmentFormView(
-                    viewModel: AppointmentViewModel(),
-                    preselectedDate: parsedSlotDate,
-                    preselectedTime: DateFormatter.timeOnly.date(from: slot.startTime)
-                )
-            }
-        }
-        .padding(16)
-        .background(Color.systemBackgroundCompat)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.green.opacity(0.2), lineWidth: 1)
-        )
-    }
-    
-    private var parsedSlotDate: Date {
+
+    private static let isoDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         formatter.locale = Locale(identifier: "en_US_POSIX")
-        return formatter.date(from: slot.date) ?? Date()
-    }
-    
-    private var formattedDate: String {
+        return formatter
+    }()
+
+    private static let shortDayMonthFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.dateStyle = .full
+        formatter.dateFormat = "d MMM"
         formatter.locale = Locale(identifier: "it_IT")
-        return formatter.string(from: parsedSlotDate).capitalized
+        return formatter
+    }()
+
+    private static let weekdayDayMonthFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEE d MMM"
+        formatter.locale = Locale(identifier: "it_IT")
+        return formatter
+    }()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .center, spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color.green.opacity(0.14))
+                        .frame(width: 38, height: 38)
+
+                    Image(systemName: "calendar.badge.clock")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(.green)
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Prossimo slot libero")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.green)
+                        .textCase(.uppercase)
+                        .lineLimit(1)
+
+                    Text(formattedDate)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Button {
+                    Haptics.play(.light)
+                    showAppointmentForm = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "plus")
+                            .font(.caption.weight(.bold))
+                        Text("Prenota")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color.green)
+                    .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .fixedSize()
+                .sheet(isPresented: $showAppointmentForm) {
+                    AppointmentFormView(
+                        viewModel: AppointmentViewModel(),
+                        preselectedDate: parsedSlotDate,
+                        preselectedTime: DateFormatter.timeOnly.date(from: slot.startTime)
+                    )
+                }
+            }
+
+            HStack(spacing: 12) {
+                HStack(spacing: 5) {
+                    Image(systemName: "clock.fill")
+                        .font(.caption)
+                        .foregroundStyle(.green)
+                    Text(slot.startTime)
+                        .font(.subheadline.weight(.semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(.primary)
+                }
+
+                if let staffName = slot.staffName, !staffName.isEmpty {
+                    Text("•")
+                        .foregroundStyle(.tertiary)
+
+                    HStack(spacing: 5) {
+                        Image(systemName: "person.fill")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(staffName)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(Color.green.opacity(0.07))
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+        .padding(14)
+        .background(Color.systemBackgroundCompat)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.green.opacity(0.22), lineWidth: 1)
+        )
+    }
+
+    private var parsedSlotDate: Date {
+        Self.isoDateFormatter.date(from: slot.date) ?? Date()
+    }
+
+    private var formattedDate: String {
+        let date = parsedSlotDate
+        let calendar = Calendar.current
+        if calendar.isDateInToday(date) {
+            return "Oggi, \(Self.shortDayMonthFormatter.string(from: date).capitalized)"
+        }
+        if calendar.isDateInTomorrow(date) {
+            return "Domani, \(Self.shortDayMonthFormatter.string(from: date).capitalized)"
+        }
+        return Self.weekdayDayMonthFormatter.string(from: date).capitalized
     }
 }
 
