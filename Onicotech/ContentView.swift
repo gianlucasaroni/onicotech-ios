@@ -4,6 +4,7 @@ internal import EventKit
 struct ContentView: View {
     @EnvironmentObject var authManager: AuthenticationManager
     @EnvironmentObject var salonManager: SalonManager
+    @State private var commandPaletteState = CommandPaletteState()
     
     var body: some View {
         if authManager.isAuthenticated {
@@ -34,9 +35,25 @@ struct ContentView: View {
             .task {
                 await salonManager.loadSalons()
             }
+            .environment(\.commandPaletteState, commandPaletteState)
+            .overlay(alignment: .center) {
+                CommandPaletteView(state: commandPaletteState)
+            }
         } else {
             LoginView()
         }
+    }
+}
+
+// Environment key for command palette
+struct CommandPaletteStateKey: EnvironmentKey {
+    static let defaultValue = CommandPaletteState()
+}
+
+extension EnvironmentValues {
+    var commandPaletteState: CommandPaletteState {
+        get { self[CommandPaletteStateKey.self] }
+        set { self[CommandPaletteStateKey.self] = newValue }
     }
 }
 

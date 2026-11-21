@@ -8,6 +8,7 @@ struct AppointmentSlotContext: Identifiable {
 
 struct AppointmentListView: View {
     @EnvironmentObject var salonManager: SalonManager
+    @Environment(\.commandPaletteState) private var commandPaletteState
     @State private var viewModel = AppointmentViewModel()
     @State private var newAppointmentSlot: AppointmentSlotContext?
     @State private var selectedAppointment: Appointment?
@@ -89,6 +90,7 @@ struct AppointmentListView: View {
         }
         .onAppear {
             viewModel.viewMode = storedViewMode
+            configureCommandPalette()
         }
         .onChange(of: viewModel.viewMode) { _, newMode in
             storedViewMode = newMode
@@ -261,6 +263,38 @@ struct AppointmentListView: View {
             Haptics.play(.selection)
             withAnimation {
                 viewModel.selectedDate = newDate
+            }
+        }
+    }
+    
+    private func configureCommandPalette() {
+        // Create placeholder view models for the command palette
+        // In a full implementation, these would come from the actual views
+        let clientVM = ClientViewModel()
+        let productVM = ProductViewModel()
+        let expenseVM = ExpenseViewModel()
+        let promotionVM = PromotionViewModel()
+        
+        commandPaletteState.configure(
+            clientVM: clientVM,
+            appointmentVM: viewModel,
+            productVM: productVM,
+            expenseVM: expenseVM,
+            promotionVM: promotionVM,
+            salonManager: salonManager
+        )
+        
+        // Set up navigation actions
+        commandPaletteState.onNewAppointment = {
+            newAppointmentSlot = AppointmentSlotContext(date: viewModel.selectedDate, time: nil)
+        }
+        
+        commandPaletteState.onNavigateAppointments = { search, date in
+            if let date = date {
+                viewModel.selectedDate = DateFormatter.iso8601DateOnly.date(from: date) ?? Date()
+            }
+            if let search = search {
+                // Could add search functionality here
             }
         }
     }

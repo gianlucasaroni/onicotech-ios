@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PromotionListView: View {
     @EnvironmentObject var salonManager: SalonManager
+    @Environment(\.commandPaletteState) private var commandPaletteState
     @StateObject private var viewModel = PromotionViewModel()
     @State private var showingAddSheet = false
     @State private var showingDeleteAlert = false
@@ -84,6 +85,29 @@ struct PromotionListView: View {
         }
         .task {
             await viewModel.loadPromotions(salonId: salonManager.selectedSalonId)
+            configureCommandPalette()
+        }
+    }
+    
+    private func configureCommandPalette() {
+        let clientVM = ClientViewModel()
+        let appointmentVM = AppointmentViewModel()
+        let productVM = ProductViewModel()
+        let expenseVM = ExpenseViewModel()
+        
+        commandPaletteState.configure(
+            clientVM: clientVM,
+            appointmentVM: appointmentVM,
+            productVM: productVM,
+            expenseVM: expenseVM,
+            promotionVM: viewModel,
+            salonManager: salonManager
+        )
+        
+        commandPaletteState.onNavigatePromotions = { search in
+            if let search = search {
+                // Add search functionality here
+            }
         }
     }
 }

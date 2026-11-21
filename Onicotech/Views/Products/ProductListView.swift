@@ -3,6 +3,7 @@ import SwiftUI
 struct ProductListView: View {
     @StateObject private var viewModel = ProductViewModel()
     @EnvironmentObject var salonManager: SalonManager
+    @Environment(\.commandPaletteState) private var commandPaletteState
     
     @State private var selectedTab = 0 // 0: Catalogo & Giacenze, 1: Vendite al Banco
     @State private var showingAddProductSheet = false
@@ -320,6 +321,42 @@ struct ProductListView: View {
     private func loadData() async {
         await viewModel.loadProducts(salonId: activeSalonId)
         await viewModel.loadSales(salonId: activeSalonId)
+        configureCommandPalette()
+    }
+    
+    private func configureCommandPalette() {
+        let clientVM = ClientViewModel()
+        let appointmentVM = AppointmentViewModel()
+        let expenseVM = ExpenseViewModel()
+        let promotionVM = PromotionViewModel()
+        
+        commandPaletteState.configure(
+            clientVM: clientVM,
+            appointmentVM: appointmentVM,
+            productVM: viewModel,
+            expenseVM: expenseVM,
+            promotionVM: promotionVM,
+            salonManager: salonManager
+        )
+        
+        commandPaletteState.onNewProduct = {
+            showingAddProductSheet = true
+        }
+        
+        commandPaletteState.onNewSale = {
+            showingSaleSheet = true
+        }
+        
+        commandPaletteState.onNavigateProducts = { newSale, newProduct, search in
+            if newSale {
+                showingSaleSheet = true
+            } else if newProduct {
+                showingAddProductSheet = true
+            }
+            if let search = search {
+                // Add search functionality here
+            }
+        }
     }
 }
 

@@ -38,16 +38,35 @@ final class CommandPaletteState {
     var isPresented = false
     var searchText = ""
     private var items: [CommandPaletteItem] = []
-    private var filteredItemsCache: [CommandPaletteItem] = []
     
-    // Services
-    @ObservationIgnored private var clientVM: ClientViewModel?
-    @ObservationIgnored private var appointmentVM: AppointmentViewModel?
-    @ObservationIgnored private var productVM: ProductViewModel?
-    @ObservationIgnored private var expenseVM: ExpenseViewModel?
-    @ObservationIgnored private var promotionVM: PromotionViewModel?
-    @ObservationIgnored private var salonManager: SalonManager?
-    @ObservationIgnored private var router: AppRouter?
+    // ViewModels (set during configuration)
+    private weak var clientVM: ClientViewModel?
+    private weak var appointmentVM: AppointmentViewModel?
+    private weak var productVM: ProductViewModel?
+    private weak var expenseVM: ExpenseViewModel?
+    private weak var promotionVM: PromotionViewModel?
+    private weak var salonManager: SalonManager?
+    
+    // Navigation actions (set by app)
+    var onNewAppointment: (() -> Void)?
+    var onNewClient: (() -> Void)?
+    var onNewSale: (() -> Void)?
+    var onNewProduct: (() -> Void)?
+    var onNewExpense: (() -> Void)?
+    var onToggleTheme: (() -> Void)?
+    var onNavigateAppointments: ((String?, String?) -> Void)?
+    var onNavigateClients: ((String?, UUID?) -> Void)?
+    var onNavigateServices: (() -> Void)?
+    var onNavigateProducts: ((Bool, Bool, String?) -> Void)?
+    var onNavigateExpenses: ((Bool, String?) -> Void)?
+    var onNavigateStatistics: (() -> Void)?
+    var onNavigateTaxes: (() -> Void)?
+    var onNavigatePromotions: ((String?) -> Void)?
+    var onNavigateSettings: ((SettingsSection) -> Void)?
+    
+    enum SettingsSection {
+        case hours, staff, booking, system
+    }
     
     func configure(
         clientVM: ClientViewModel,
@@ -55,8 +74,7 @@ final class CommandPaletteState {
         productVM: ProductViewModel,
         expenseVM: ExpenseViewModel,
         promotionVM: PromotionViewModel,
-        salonManager: SalonManager,
-        router: AppRouter
+        salonManager: SalonManager
     ) {
         self.clientVM = clientVM
         self.appointmentVM = appointmentVM
@@ -64,12 +82,11 @@ final class CommandPaletteState {
         self.expenseVM = expenseVM
         self.promotionVM = promotionVM
         self.salonManager = salonManager
-        self.router = router
         rebuildItems()
     }
     
     private func rebuildItems() {
-        guard let salonId = salonManager.selectedSalonId else { return }
+        guard salonManager?.selectedSalonId != nil else { return }
         
         var newItems: [CommandPaletteItem] = []
         
@@ -80,55 +97,37 @@ final class CommandPaletteState {
                 subtitle: "Pianifica un appuntamento a calendario",
                 systemImage: "calendar.badge.plus",
                 category: .actions
-            ) { [weak self] in
-                self?.router?.navigateToAppointments(newAppointment: true)
-                self?.close()
-            },
+            ) { [weak self] in self?.onNewAppointment?() },
             CommandPaletteItem(
                 title: "Nuova Cliente",
                 subtitle: "Registra una nuova scheda cliente",
                 systemImage: "person.badge.plus",
                 category: .actions
-            ) { [weak self] in
-                self?.router?.navigateToClients(newClient: true)
-                self?.close()
-            },
+            ) { [weak self] in self?.onNewClient?() },
             CommandPaletteItem(
                 title: "Nuova Vendita Retail (Cassa)",
                 subtitle: "Registra un acquisto prodotti al banco",
                 systemImage: "cart.badge.plus",
                 category: .actions
-            ) { [weak self] in
-                self?.router?.navigateToProducts(newSale: true)
-                self?.close()
-            },
+            ) { [weak self] in self?.onNewSale?() },
             CommandPaletteItem(
                 title: "Nuovo Prodotto a Magazzino",
                 subtitle: "Aggiungi articolo, scorta e prezzo vendita",
                 systemImage: "shippingbox.fill",
                 category: .actions
-            ) { [weak self] in
-                self?.router?.navigateToProducts(newProduct: true)
-                self?.close()
-            },
+            ) { [weak self] in self?.onNewProduct?() },
             CommandPaletteItem(
                 title: "Nuova Spesa / Uscita",
                 subtitle: "Registra spesa operativa, scontrino o fornitura",
                 systemImage: "creditcard.fill",
                 category: .actions
-            ) { [weak self] in
-                self?.router?.navigateToExpenses(newExpense: true)
-                self?.close()
-            },
+            ) { [weak self] in self?.onNewExpense?() },
             CommandPaletteItem(
                 title: "Inverti Tema Chiaro / Scuro",
                 subtitle: "Alterna istantaneamente la visualizzazione dark mode",
                 systemImage: "circle.lefthalf.filled",
                 category: .actions
-            ) { [weak self] in
-                self?.toggleTheme()
-                self?.close()
-            }
+            ) { [weak self] in self?.onToggleTheme?() }
         ])
         
         // MARK: - Navigazione
@@ -138,76 +137,76 @@ final class CommandPaletteState {
                 subtitle: "Visualizza e pianifica trattamenti",
                 systemImage: "calendar",
                 category: .navigation
-            ) { [weak self] in self?.router?.navigateToAppointments(); self?.close() },
+            ) { [weak self] in self?.onNavigateAppointments?(nil, nil) },
             CommandPaletteItem(
                 title: "Anagrafica Clienti",
                 subtitle: "Elenco clienti, storico e recall",
                 systemImage: "person.3",
                 category: .navigation
-            ) { [weak self] in self?.router?.navigateToClients(); self?.close() },
+            ) { [weak self] in self?.onNavigateClients?(nil, nil) },
             CommandPaletteItem(
                 title: "Listino Servizi & Trattamenti",
                 subtitle: "Trattamenti, durate e prezzi",
                 systemImage: "scissors",
                 category: .navigation
-            ) { [weak self] in self?.router?.navigateToServices(); self?.close() },
+            ) { [weak self] in self?.onNavigateServices?() },
             CommandPaletteItem(
                 title: "Magazzino Prodotti & Retail",
                 subtitle: "Giacenze, barcode e retail",
                 systemImage: "shippingbox",
                 category: .navigation
-            ) { [weak self] in self?.router?.navigateToProducts(); self?.close() },
+            ) { [weak self] in self?.onNavigateProducts?(false, false, nil) },
             CommandPaletteItem(
                 title: "Spese & Uscite",
                 subtitle: "Registrazione spese operative",
                 systemImage: "creditcard",
                 category: .navigation
-            ) { [weak self] in self?.router?.navigateToExpenses(); self?.close() },
+            ) { [weak self] in self?.onNavigateExpenses?(false, nil) },
             CommandPaletteItem(
                 title: "Statistiche & Incassi",
                 subtitle: "Fatturato, scontrino medio e trend",
                 systemImage: "chart.bar",
                 category: .navigation
-            ) { [weak self] in self?.router?.navigateToStatistics(); self?.close() },
+            ) { [weak self] in self?.onNavigateStatistics?() },
             CommandPaletteItem(
                 title: "Fisco & Tasse (Forfettario)",
                 subtitle: "Stima tasse e contributi INPS",
                 systemImage: "eurosign.circle",
                 category: .navigation
-            ) { [weak self] in self?.router?.navigateToTaxes(); self?.close() },
+            ) { [weak self] in self?.onNavigateTaxes?() },
             CommandPaletteItem(
                 title: "Promozioni & Offerte",
                 subtitle: "Gestisci sconti e voucher",
                 systemImage: "tag.fill",
                 category: .navigation
-            ) { [weak self] in self?.router?.navigateToPromotions(); self?.close() },
+            ) { [weak self] in self?.onNavigatePromotions?(nil) },
             CommandPaletteItem(
                 title: "Orari di Apertura",
                 subtitle: "Configura fasce orarie e pause pranzo",
                 systemImage: "clock",
                 category: .navigation
-            ) { [weak self] in self?.router?.navigateToSettings(.hours); self?.close() },
+            ) { [weak self] in self?.onNavigateSettings?(.hours) },
             CommandPaletteItem(
                 title: "Team & Collaboratrici",
                 subtitle: "Gestione operatrici e permessi",
                 systemImage: "person.2.badge.key.fill",
                 category: .navigation
-            ) { [weak self] in self?.router?.navigateToSettings(.staff); self?.close() },
+            ) { [weak self] in self?.onNavigateSettings?(.staff) },
             CommandPaletteItem(
                 title: "Booking Online",
                 subtitle: "Link pubblico e impostazioni prenotazione",
                 systemImage: "globe",
                 category: .navigation
-            ) { [weak self] in self?.router?.navigateToSettings(.booking); self?.close() },
+            ) { [weak self] in self?.onNavigateSettings?(.booking) },
             CommandPaletteItem(
                 title: "Account & Impostazioni",
                 subtitle: "Profilo, sicurezza e sistema",
                 systemImage: "gear",
                 category: .navigation
-            ) { [weak self] in self?.router?.navigateToSettings(.system); self?.close() }
+            ) { [weak self] in self?.onNavigateSettings?(.system) }
         ])
         
-        // MARK: - Clienti (from ClientViewModel)
+        // MARK: - Clienti
         if let clients = clientVM?.clients {
             for client in clients.prefix(10) {
                 newItems.append(CommandPaletteItem(
@@ -216,13 +215,12 @@ final class CommandPaletteState {
                     systemImage: "person.circle",
                     category: .clients
                 ) { [weak self] in
-                    self?.router?.navigateToClients(search: client.fullName, clientId: client.id)
-                    self?.close()
+                    self?.onNavigateClients?(client.fullName, client.id)
                 })
             }
         }
         
-        // MARK: - Appuntamenti (from AppointmentViewModel)
+        // MARK: - Appuntamenti
         if let appointments = appointmentVM?.appointments {
             let upcoming = appointments
                 .filter { $0.date >= DateFormatter.iso8601DateOnly.string(from: Date()) }
@@ -238,13 +236,12 @@ final class CommandPaletteState {
                     systemImage: "calendar.badge.clock",
                     category: .appointments
                 ) { [weak self] in
-                    self?.router?.navigateToAppointments(search: clientName, date: appt.date)
-                    self?.close()
+                    self?.onNavigateAppointments?(clientName, appt.date)
                 })
             }
         }
         
-        // MARK: - Prodotti (from ProductViewModel)
+        // MARK: - Prodotti
         if let products = productVM?.products {
             for product in products.prefix(8) {
                 let stock = product.stock ?? 0
@@ -255,14 +252,13 @@ final class CommandPaletteState {
                     systemImage: "shippingbox.fill",
                     category: .products
                 ) { [weak self] in
-                    self?.router?.navigateToProducts(search: product.name)
-                    self?.close()
+                    self?.onNavigateProducts?(false, false, product.name)
                 })
             }
         }
         
-        // MARK: - Spese (from ExpenseViewModel) - solo owner
-        if salonManager.activeRole == "owner", let expenses = expenseVM?.expenses {
+        // MARK: - Spese (solo owner)
+        if salonManager?.activeRole == "owner", let expenses = expenseVM?.expenses {
             for expense in expenses.prefix(5) {
                 newItems.append(CommandPaletteItem(
                     title: expense.description,
@@ -270,13 +266,12 @@ final class CommandPaletteState {
                     systemImage: "creditcard.fill",
                     category: .expenses
                 ) { [weak self] in
-                    self?.router?.navigateToExpenses(search: expense.description)
-                    self?.close()
+                    self?.onNavigateExpenses?(false, expense.description)
                 })
             }
         }
         
-        // MARK: - Promozioni (from PromotionViewModel)
+        // MARK: - Promozioni
         if let promotions = promotionVM?.promotions {
             for promo in promotions.prefix(5) {
                 newItems.append(CommandPaletteItem(
@@ -285,14 +280,12 @@ final class CommandPaletteState {
                     systemImage: "tag.fill",
                     category: .promotions
                 ) { [weak self] in
-                    self?.router?.navigateToPromotions(search: promo.name)
-                    self?.close()
+                    self?.onNavigatePromotions?(promo.name)
                 })
             }
         }
         
         items = newItems
-        filteredItemsCache = newItems
     }
     
     var filteredItems: [CommandPaletteItem] {
@@ -312,13 +305,6 @@ final class CommandPaletteState {
     
     func toggle() {
         if isPresented { close() } else { open() }
-    }
-    
-    private func toggleTheme() {
-        // Theme toggle is handled by AppAppearanceManager
-        if let manager = AppAppearanceManager.shared {
-            manager.toggle()
-        }
     }
     
     func refresh() {
@@ -536,62 +522,6 @@ struct CommandPaletteRow: View {
         case .expenses: return .red
         case .promotions: return .pink
         }
-    }
-}
-
-// MARK: - App Router Protocol (to be implemented by main app)
-
-@MainActor
-protocol AppRouter: AnyObject {
-    func navigateToAppointments(newAppointment: Bool, search: String?, date: String?)
-    func navigateToClients(newClient: Bool, search: String?, clientId: UUID?)
-    func navigateToServices()
-    func navigateToProducts(newSale: Bool, newProduct: Bool, search: String?)
-    func navigateToExpenses(newExpense: Bool, search: String?)
-    func navigateToStatistics()
-    func navigateToTaxes()
-    func navigateToPromotions(search: String?)
-    func navigateToSettings(_ section: SettingsSection)
-    
-    func navigateToAppointments(newAppointment: Bool)
-    func navigateToClients(newClient: Bool)
-    func navigateToProducts(newSale: Bool, newProduct: Bool)
-    func navigateToExpenses(newExpense: Bool)
-}
-
-extension AppRouter {
-    func navigateToAppointments(newAppointment: Bool = false, search: String? = nil, date: String? = nil) {
-        navigateToAppointments(newAppointment: newAppointment, search: search, date: date)
-    }
-    func navigateToClients(newClient: Bool = false, search: String? = nil, clientId: UUID? = nil) {
-        navigateToClients(newClient: newClient, search: search, clientId: clientId)
-    }
-    func navigateToProducts(newSale: Bool = false, newProduct: Bool = false, search: String? = nil) {
-        navigateToProducts(newSale: newSale, newProduct: newProduct, search: search)
-    }
-    func navigateToExpenses(newExpense: Bool = false, search: String? = nil) {
-        navigateToExpenses(newExpense: newExpense, search: search)
-    }
-    func navigateToPromotions(search: String? = nil) {
-        navigateToPromotions(search: search)
-    }
-}
-
-enum SettingsSection {
-    case hours, staff, booking, system
-}
-
-// MARK: - AppAppearanceManager (placeholder for theme)
-
-@MainActor
-@Observable
-final class AppAppearanceManager {
-    static var shared: AppAppearanceManager?
-    var isDarkMode = false
-    
-    func toggle() {
-        isDarkMode.toggle()
-        // Apply theme
     }
 }
 

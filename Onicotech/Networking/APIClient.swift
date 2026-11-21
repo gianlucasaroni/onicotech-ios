@@ -542,6 +542,15 @@ final class APIClient {
         return data
     }
     
+    func getNextFreeSlot(salonId: UUID? = nil) async throws -> NextFreeSlot? {
+        var queryItems: [URLQueryItem]? = nil
+        if let salonId {
+            queryItems = [URLQueryItem(name: "salonId", value: salonId.uuidString)]
+        }
+        let response: APIResponse<NextFreeSlot> = try await request(path: "/dashboard/next-free-slot", queryItems: queryItems)
+        return response.data
+    }
+    
     // MARK: - System
     
     func invalidateCache() async throws {

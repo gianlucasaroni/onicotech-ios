@@ -15,6 +15,12 @@ struct DashboardView: View {
                 // Header
                 headerView
                 
+                // Next Free Slot Widget
+                if let slot = viewModel.nextFreeSlot {
+                    NextFreeSlotWidget(slot: slot)
+                        .padding(.horizontal)
+                }
+                
                 // Pending Online Bookings Banner
                 if viewModel.pendingBookingsCount > 0 {
                     NavigationLink(destination: AppointmentListView()) {
@@ -212,6 +218,82 @@ struct StatCard: View {
         .background(Color.systemBackgroundCompat)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+    }
+}
+
+// MARK: - Next Free Slot Widget
+
+struct NextFreeSlotWidget: View {
+    let slot: NextFreeSlot
+    
+    var body: some View {
+        HStack(spacing: 14) {
+            // Icon
+            ZStack {
+                Circle()
+                    .fill(Color.green.opacity(0.15))
+                    .frame(width: 48, height: 48)
+                
+                Image(systemName: "calendar.badge.clock")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(.green)
+            }
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Prossimo slot libero")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.secondary)
+                    .textCase(.uppercase)
+                
+                Text(formattedDate)
+                    .font(.headline)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.primary)
+                
+                HStack(spacing: 8) {
+                    Label(slot.startTime, systemImage: "clock")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    
+                    if let staffName = slot.staffName, !staffName.isEmpty {
+                        Label(staffName, systemImage: "person.fill")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            
+            Spacer()
+            
+            NavigationLink(destination: AppointmentListView()) {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(8)
+                    .background(Color.secondary.opacity(0.1))
+                    .clipShape(Circle())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(16)
+        .background(Color.systemBackgroundCompat)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.green.opacity(0.2), lineWidth: 1)
+        )
+    }
+    
+    private var formattedDate: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        guard let date = formatter.date(from: slot.date) else { return slot.date }
+        
+        formatter.dateStyle = .full
+        formatter.locale = Locale(identifier: "it_IT")
+        return formatter.string(from: date).capitalized
     }
 }
 
