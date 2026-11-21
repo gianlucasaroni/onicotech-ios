@@ -418,46 +418,75 @@ struct AppointmentWeekView: View {
                         .frame(height: 3)
                 }
                 
-                HStack(spacing: 6) {
-                    // Day Number Circle Badge
-                    ZStack {
-                        if isToday {
-                            Circle()
-                                .fill(Color.red)
-                                .frame(width: 26, height: 26)
-                        } else if isSelected {
-                            Circle()
-                                .fill(Color.blue.opacity(0.18))
-                                .frame(width: 26, height: 26)
-                        }
-                        
-                        Text("\(dayNum)")
-                            .font(.system(size: 13, weight: isToday || isSelected ? .bold : .semibold))
-                            .foregroundStyle(isToday ? Color.white : (isSelected ? Color.blue : Color.primary))
-                    }
-                    .frame(width: 26, height: 26)
-                    
-                    VStack(alignment: .leading, spacing: 1) {
+                if width < 90 {
+                    // Compact centered vertical header for 5-day / 7-day narrow columns
+                    VStack(spacing: 2) {
                         Text(dayName.uppercased())
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(isToday ? Color.red : (isSelected ? Color.blue : Color.primary))
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(isToday ? Color.red : (isSelected ? Color.blue : Color.secondary))
                             .lineLimit(1)
                         
-                        if closed && apptCount == 0 {
-                            Text("Chiuso")
-                                .font(.system(size: 8, weight: .bold))
-                                .foregroundStyle(.secondary)
-                        } else if apptCount > 0 {
-                            Text("\(apptCount) appt")
-                                .font(.system(size: 8, weight: .semibold))
-                                .foregroundStyle(isToday ? Color.red : Color.blue)
+                        ZStack {
+                            if isToday {
+                                Circle()
+                                    .fill(Color.red)
+                                    .frame(width: 22, height: 22)
+                            } else if isSelected {
+                                Circle()
+                                    .fill(Color.blue.opacity(0.18))
+                                    .frame(width: 22, height: 22)
+                            }
+                            
+                            Text("\(dayNum)")
+                                .font(.system(size: 12, weight: isToday || isSelected ? .bold : .semibold))
+                                .foregroundStyle(isToday ? Color.white : (isSelected ? Color.blue : Color.primary))
                         }
+                        .frame(width: 22, height: 22)
                     }
-                    
-                    Spacer(minLength: 0)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(.top, 2)
+                } else {
+                    HStack(spacing: 6) {
+                        // Day Number Circle Badge
+                        ZStack {
+                            if isToday {
+                                Circle()
+                                    .fill(Color.red)
+                                    .frame(width: 26, height: 26)
+                            } else if isSelected {
+                                Circle()
+                                    .fill(Color.blue.opacity(0.18))
+                                    .frame(width: 26, height: 26)
+                            }
+                            
+                            Text("\(dayNum)")
+                                .font(.system(size: 13, weight: isToday || isSelected ? .bold : .semibold))
+                                .foregroundStyle(isToday ? Color.white : (isSelected ? Color.blue : Color.primary))
+                        }
+                        .frame(width: 26, height: 26)
+                        
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(dayName.uppercased())
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(isToday ? Color.red : (isSelected ? Color.blue : Color.primary))
+                                .lineLimit(1)
+                            
+                            if closed && apptCount == 0 {
+                                Text("Chiuso")
+                                    .font(.system(size: 8, weight: .bold))
+                                    .foregroundStyle(.secondary)
+                            } else if apptCount > 0 {
+                                Text("\(apptCount) appt")
+                                    .font(.system(size: 8, weight: .semibold))
+                                    .foregroundStyle(isToday ? Color.red : Color.blue)
+                            }
+                        }
+                        
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 6)
+                    .frame(maxHeight: .infinity)
                 }
-                .padding(.horizontal, 6)
-                .frame(maxHeight: .infinity)
             }
             .contentShape(Rectangle())
         }
@@ -624,13 +653,21 @@ struct AppointmentWeekView: View {
             // 4. Appointment Cards
             ForEach(layoutAppts) { item in
                 let appt = item.appointment
-                let topOffset = CGFloat(appt.startMinutes - minHour * 60) * pixelsPerMinute
+                let topOffset = CGFloat(appt.startMinutes - minHour * 60) * pixelsPerMinute + 1.0
                 let duration = max(20, appt.durationMinutes)
                 let height = max(26.0, CGFloat(duration) * pixelsPerMinute - 2.0)
-                let cardWidth = max(20.0, (width - 4.0) / CGFloat(item.totalCols) - 2.0)
-                let leftOffset = 2.0 + CGFloat(item.colIndex) * ((width - 4.0) / CGFloat(item.totalCols))
+                let horizontalInset: CGFloat = width < 70 ? 1.5 : 3.0
+                let colGap: CGFloat = 2.0
+                let usableWidth = max(20.0, width - horizontalInset * 2.0)
+                let cardWidth = max(18.0, (usableWidth - colGap * CGFloat(max(0, item.totalCols - 1))) / CGFloat(max(1, item.totalCols)))
+                let leftOffset = horizontalInset + CGFloat(item.colIndex) * (cardWidth + colGap)
                 
-                WeekAppointmentCard(appointment: appt, width: cardWidth, height: height, isCompact: densityMode == .fullWeek)
+                WeekAppointmentCard(
+                    appointment: appt,
+                    width: cardWidth,
+                    height: height,
+                    isCompact: densityMode == .fullWeek || cardWidth < 88
+                )
                     .frame(width: cardWidth, height: height)
                     .offset(x: leftOffset, y: topOffset)
                     .onTapGesture {
@@ -820,8 +857,16 @@ struct AppointmentWeekView: View {
     // MARK: - Vertical Separator (Crisp 1.0pt Native Separator)
     private var verticalSeparator: some View {
         Rectangle()
-            .fill(Color(UIColor.opaqueSeparator))
+            .fill(separatorColor)
             .frame(width: separatorWidth)
+    }
+
+    private var separatorColor: Color {
+        #if os(iOS)
+        Color(UIColor.opaqueSeparator)
+        #else
+        Color(nsColor: .separatorColor)
+        #endif
     }
     
     // MARK: - Actions & Helpers
@@ -1019,11 +1064,15 @@ struct WeekAppointmentCard: View {
     let width: CGFloat
     let height: CGFloat
     let isCompact: Bool
-    
-    private var statusColor: Color {
+
+    private var accentColor: Color {
         if let staffColor = appointment.staffMember?.color, !staffColor.isEmpty {
             return Color(hex: staffColor)
         }
+        return semanticStatusColor
+    }
+
+    private var semanticStatusColor: Color {
         switch appointment.status {
         case .scheduled: return .blue
         case .pending: return .orange
@@ -1034,78 +1083,167 @@ struct WeekAppointmentCard: View {
         case .none: return .blue
         }
     }
-    
+
+    private var isPending: Bool {
+        appointment.status == .pending
+    }
+
+    private var isCompleted: Bool {
+        appointment.status == .completed
+    }
+
+    private var clientDisplayName: String {
+        guard let client = appointment.client else { return "Cliente" }
+        if width < 64 {
+            return client.firstName.isEmpty ? client.fullName : client.firstName
+        }
+        return client.fullName
+    }
+
+    private var timeLabel: String {
+        if isCompact || width < 110 {
+            return appointment.startTime
+        }
+        return appointment.timeRange
+    }
+
+    private var servicesSummary: String? {
+        guard let services = appointment.services, let first = services.first else { return nil }
+        return services.count > 1 ? "\(first.name) +\(services.count - 1)" : first.name
+    }
+
+    private var hasAllergies: Bool {
+        if let allergies = appointment.client?.allergies, !allergies.isEmpty {
+            return true
+        }
+        return false
+    }
+
     var body: some View {
         HStack(spacing: 0) {
             // Left solid accent stripe
-            RoundedRectangle(cornerRadius: 2)
-                .fill(statusColor)
-                .frame(width: 3.5)
-            
-            VStack(alignment: .leading, spacing: 2) {
-                // Time Range & Status Icon
-                HStack(spacing: 3) {
-                    Text(appointment.timeRange)
-                        .font(.system(size: 10, weight: .bold).monospacedDigit())
-                        .foregroundStyle(statusColor)
-                        .lineLimit(1)
-                    
-                    Spacer(minLength: 0)
-                    
-                    if let status = appointment.status {
-                        Image(systemName: status.iconName)
-                            .font(.system(size: 8))
-                            .foregroundStyle(statusColor)
-                    }
-                }
-                
-                // Client Name
-                if let client = appointment.client {
-                    Text(client.fullName)
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                } else {
-                    Text("Cliente")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(.primary)
-                }
-                
-                // Service Name (if card height permits)
-                if height >= 40, let services = appointment.services, let first = services.first {
-                    Text(first.name + (services.count > 1 ? " (+\(services.count - 1))" : ""))
-                        .font(.system(size: 9))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-                
-                // Staff member pill (if card height permits)
-                if height >= 58, let staff = appointment.staffMember {
-                    HStack(spacing: 3) {
-                        Circle()
-                            .fill(Color(hex: staff.color ?? "#9333EA"))
-                            .frame(width: 5, height: 5)
-                        Text(staff.displayName)
-                            .font(.system(size: 8, weight: .medium))
-                            .foregroundStyle(.secondary)
+            Rectangle()
+                .fill(accentColor)
+                .frame(width: width < 64 ? 3 : 3.5)
+
+            Group {
+                if height < 36 {
+                    // Ultra-compact single-line layout for short (<= 30 min) slots
+                    HStack(spacing: 4) {
+                        Text(appointment.startTime)
+                            .font(.system(size: 9.5, weight: .bold).monospacedDigit())
+                            .foregroundStyle(accentColor)
                             .lineLimit(1)
+                            .fixedSize()
+
+                        if width >= 72 {
+                            Text(clientDisplayName)
+                                .font(.system(size: 10.5, weight: .semibold))
+                                .foregroundStyle(.primary)
+                                .lineLimit(1)
+                        }
+
+                        Spacer(minLength: 0)
+
+                        if width >= 85, let status = appointment.status {
+                            Image(systemName: status.iconName)
+                                .font(.system(size: 8.5, weight: .semibold))
+                                .foregroundStyle(semanticStatusColor)
+                        }
                     }
+                    .padding(.horizontal, width < 64 ? 3 : 5)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                } else {
+                    VStack(alignment: .leading, spacing: 2) {
+                        // Top row: time + status indicator (+ allergy warning)
+                        HStack(spacing: 3) {
+                            Text(timeLabel)
+                                .font(.system(size: width < 64 ? 9 : 10, weight: .bold).monospacedDigit())
+                                .foregroundStyle(accentColor)
+                                .lineLimit(1)
+
+                            Spacer(minLength: 0)
+
+                            if hasAllergies && width >= 82 {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.system(size: 8))
+                                    .foregroundStyle(.red)
+                            }
+
+                            if width >= 62, let status = appointment.status {
+                                Image(systemName: status.iconName)
+                                    .font(.system(size: 8.5, weight: .semibold))
+                                    .foregroundStyle(semanticStatusColor)
+                            }
+                        }
+
+                        // Client Name
+                        Text(clientDisplayName)
+                            .font(.system(size: width < 64 ? 10 : 11.5, weight: .semibold))
+                            .foregroundStyle(.primary)
+                            .lineLimit(height >= 72 && width < 80 ? 2 : 1)
+
+                        // Service summary (if height permits)
+                        if height >= 52, width >= 68, let summary = servicesSummary {
+                            Text(summary)
+                                .font(.system(size: 9.5))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+
+                        // Bottom footer: Staff + Price (if tall & wide enough)
+                        if height >= 72, width >= 92 {
+                            Spacer(minLength: 0)
+                            HStack(spacing: 4) {
+                                if let staff = appointment.staffMember {
+                                    HStack(spacing: 3) {
+                                        Circle()
+                                            .fill(Color(hex: staff.color ?? "#9333EA"))
+                                            .frame(width: 5, height: 5)
+                                        Text(staff.displayName)
+                                            .font(.system(size: 8.5, weight: .medium))
+                                            .foregroundStyle(.secondary)
+                                            .lineLimit(1)
+                                    }
+                                }
+
+                                Spacer(minLength: 2)
+
+                                if appointment.totalPrice != nil || appointment.finalPrice != nil {
+                                    Text(appointment.formattedFinalPrice)
+                                        .font(.system(size: 9, weight: .semibold).monospacedDigit())
+                                        .foregroundStyle(.primary.opacity(0.8))
+                                        .lineLimit(1)
+                                        .fixedSize()
+                                }
+                            }
+                        } else {
+                            Spacer(minLength: 0)
+                        }
+                    }
+                    .padding(.horizontal, width < 64 ? 3 : 6)
+                    .padding(.vertical, 4)
                 }
-                
-                Spacer(minLength: 0)
             }
-            .padding(.horizontal, 4)
-            .padding(.vertical, 3)
         }
         .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(statusColor.opacity(0.16))
+            ZStack {
+                Color.systemBackgroundCompat
+                accentColor.opacity(isCompleted ? 0.10 : 0.15)
+            }
         )
+        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 6)
-                .stroke(statusColor.opacity(0.35), lineWidth: 0.8)
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .stroke(
+                    isPending ? Color.orange.opacity(0.75) : accentColor.opacity(0.32),
+                    style: isPending
+                        ? StrokeStyle(lineWidth: 1.1, dash: [4, 2.5])
+                        : StrokeStyle(lineWidth: 0.75)
+                )
         )
-        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .shadow(color: Color.black.opacity(0.05), radius: 1.5, x: 0, y: 1)
+        .opacity(isCompleted ? 0.82 : 1.0)
         .contentShape(Rectangle())
     }
 }

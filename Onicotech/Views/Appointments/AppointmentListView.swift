@@ -297,113 +297,142 @@ struct AppointmentRowView: View {
         case .none: return .gray
         }
     }
+
+    private var accentColor: Color {
+        if let hex = appointment.staffMember?.color, !hex.isEmpty {
+            return Color(hex: hex)
+        }
+        return statusColor
+    }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(appointment.timeRange)
-                    .font(.headline)
-                    .monospacedDigit()
-                
-                if let salon = appointment.salon {
-                    SalonBadge(name: salon.name, isDefault: salon.isDefault)
-                }
-                
-                Spacer()
-                
-                if let status = appointment.status {
-                    Label(status.displayName, systemImage: status.iconName)
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(statusColor.opacity(0.12))
-                        .foregroundStyle(statusColor)
-                        .clipShape(Capsule())
-                }
-            }
-            
-            if let client = appointment.client {
+        HStack(alignment: .top, spacing: 10) {
+            Capsule()
+                .fill(accentColor)
+                .frame(width: 3.5)
+                .padding(.vertical, 2)
+
+            VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 6) {
-                    Label(client.fullName, systemImage: "person")
-                        .font(.subheadline)
+                    Text(appointment.timeRange)
+                        .font(.subheadline.weight(.bold))
+                        .monospacedDigit()
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
                     
-                    if let staff = appointment.staffMember {
-                        HStack(spacing: 4) {
-                            Circle()
-                                .fill(Color(hex: staff.color ?? "#9333EA"))
-                                .frame(width: 7, height: 7)
-                            Text(staff.displayName)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.secondary.opacity(0.1))
-                        .clipShape(Capsule())
+                    if let salon = appointment.salon {
+                        SalonBadge(name: salon.name, isDefault: salon.isDefault)
                     }
                     
-                    if let tag = client.customerTag, !tag.isEmpty {
-                        Text(tag)
+                    Spacer(minLength: 4)
+                    
+                    if let status = appointment.status {
+                        Label(status.displayName, systemImage: status.iconName)
+                            .font(.caption2.weight(.semibold))
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(statusColor.opacity(0.12))
+                            .foregroundStyle(statusColor)
+                            .clipShape(Capsule())
+                            .fixedSize()
+                    }
+                }
+                
+                if let client = appointment.client {
+                    HStack(spacing: 6) {
+                        Text(client.fullName)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+                        
+                        if let tag = client.customerTag, !tag.isEmpty {
+                            Text(tag)
+                                .font(.caption2.bold())
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 1)
+                                .background(Color.purple.opacity(0.12))
+                                .foregroundStyle(.purple)
+                                .clipShape(Capsule())
+                                .fixedSize()
+                        }
+                        
+                        if let allergies = client.allergies, !allergies.isEmpty {
+                            HStack(spacing: 2) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                Text(allergies)
+                                    .lineLimit(1)
+                            }
                             .font(.caption2.bold())
                             .padding(.horizontal, 5)
                             .padding(.vertical, 1)
-                            .background(Color.purple.opacity(0.12))
-                            .foregroundStyle(.purple)
+                            .background(Color.red.opacity(0.12))
+                            .foregroundStyle(.red)
                             .clipShape(Capsule())
-                    }
-                    
-                    if let allergies = client.allergies, !allergies.isEmpty {
-                        HStack(spacing: 2) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                            Text(allergies)
                         }
-                        .font(.caption2.bold())
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 1)
-                        .background(Color.red.opacity(0.12))
-                        .foregroundStyle(.red)
-                        .clipShape(Capsule())
+                        
+                        Spacer(minLength: 0)
+                        
+                        if let staff = appointment.staffMember {
+                            HStack(spacing: 4) {
+                                Circle()
+                                    .fill(Color(hex: staff.color ?? "#9333EA"))
+                                    .frame(width: 6, height: 6)
+                                Text(staff.displayName)
+                                    .font(.caption2.weight(.medium))
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.secondary.opacity(0.1))
+                            .clipShape(Capsule())
+                            .fixedSize()
+                        }
                     }
                 }
-            }
-            
-            if let services = appointment.services, !services.isEmpty {
-                Text(services.map(\.name).joined(separator: ", "))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-
-            if let products = appointment.products, !products.isEmpty {
-                HStack(spacing: 4) {
-                    Image(systemName: "bag.fill")
-                        .font(.caption2)
-                    Text("\(products.count) prodott\(products.count == 1 ? "o" : "i") riservat\(products.count == 1 ? "o" : "i")")
-                        .font(.caption2.bold())
-                }
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(Color.blue.opacity(0.12))
-                .foregroundStyle(.blue)
-                .clipShape(Capsule())
-            }
-            
-            HStack {
-                if let notes = appointment.notes, !notes.isEmpty {
-                    Label(notes, systemImage: "note.text")
+                
+                if let services = appointment.services, !services.isEmpty {
+                    Text(services.map(\.name).joined(separator: ", "))
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                        .lineLimit(2)
                 }
-                Spacer()
-                if appointment.totalPrice != nil || appointment.finalPrice != nil {
-                    Text(appointment.formattedFinalPrice)
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(.primary)
+
+                HStack(spacing: 6) {
+                    if let products = appointment.products, !products.isEmpty {
+                        HStack(spacing: 3) {
+                            Image(systemName: "bag.fill")
+                                .font(.caption2)
+                            Text("\(products.count) prod.")
+                                .font(.caption2.bold())
+                        }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.blue.opacity(0.12))
+                        .foregroundStyle(.blue)
+                        .clipShape(Capsule())
+                        .fixedSize()
+                    }
+                    
+                    if let notes = appointment.notes, !notes.isEmpty {
+                        Label(notes, systemImage: "note.text")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    
+                    Spacer(minLength: 4)
+                    
+                    if appointment.totalPrice != nil || appointment.finalPrice != nil {
+                        Text(appointment.formattedFinalPrice)
+                            .font(.subheadline.weight(.semibold))
+                            .monospacedDigit()
+                            .foregroundStyle(.primary)
+                            .fixedSize()
+                    }
                 }
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 3)
     }
 }
