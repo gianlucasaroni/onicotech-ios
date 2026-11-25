@@ -48,7 +48,7 @@ struct AppointmentFormView: View {
         self.preselectedTime = preselectedTime
         
         let initialDate = preselectedDate ?? Date()
-        let initialTime = preselectedTime ?? Date()
+        let initialTime = MinuteIntervalTimePicker.roundedUp(preselectedTime ?? Date(), minuteInterval: 5)
         _date = State(initialValue: initialDate)
         _startTime = State(initialValue: initialTime)
     }
@@ -89,7 +89,7 @@ struct AppointmentFormView: View {
                     Form {
                         Section("Data e Ora") {
                             DatePicker("Data", selection: $date, displayedComponents: .date)
-                            DatePicker("Ora inizio", selection: $startTime, displayedComponents: .hourAndMinute)
+                            MinuteIntervalTimePicker(title: "Ora inizio", selection: $startTime, minuteInterval: 5)
                         }
                         
                         if salonManager.salons.count > 1 {
@@ -495,7 +495,7 @@ struct AppointmentFormView: View {
                 date = preselectedDate
             }
             if let preselectedTime {
-                startTime = preselectedTime
+                startTime = MinuteIntervalTimePicker.roundedUp(preselectedTime, minuteInterval: 5)
             }
         }
         
